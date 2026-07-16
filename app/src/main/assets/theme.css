@@ -1,0 +1,164 @@
+/*
+ * Sleek Interface Theme - ZamZam ERP / System Console
+ * Color Palette: Emerald Green & Crisp Clean White
+ * Features: Glassmorphism, Modern Typography, Responsive Grid & Flexbox Variables
+ */
+
+:root {
+    /* --- COLOR PALETTE (Green & White Theme) --- */
+    --color-primary: #059669;         /* Beautiful Emerald Green */
+    --color-primary-hover: #047857;   /* Darker Emerald Green */
+    --color-primary-light: #e6f4ea;   /* Soft Sage Green background tint */
+    --color-primary-glow: rgba(5, 150, 105, 0.15); /* Soft shadow glow */
+    
+    --color-secondary: #10b981;       /* Mint Accent Green */
+    --color-success: #10b981;         /* Success indicator */
+    --color-warning: #f59e0b;         /* Warning / Low Stock indicator */
+    --color-danger: #ef4444;          /* Critical stock / Expense indicator */
+    
+    /* Whites, Grays & Off-whites */
+    --color-bg-main: #f8fafc;         /* Slate 50 (Very light cool gray-white) */
+    --color-bg-sidebar: #ffffff;      /* Pure White for clean sidebar */
+    --color-bg-card: rgba(255, 255, 255, 0.75); /* Translucent White for glassmorphism */
+    
+    --color-border-light: rgba(226, 232, 240, 0.8); /* Slate 200 translucent border */
+    --color-border-glass: rgba(255, 255, 255, 0.3); /* Ultra light border for glassmorphism */
+    
+    /* Text colors */
+    --color-text-primary: #1e293b;    /* Slate 800 (Dark Charcoal) */
+    --color-text-secondary: #64748b;  /* Slate 500 (Muted Gray) */
+    --color-text-light: #94a3b8;      /* Slate 400 (De-emphasized Gray) */
+    --color-text-on-primary: #ffffff; /* White text on green backgrounds */
+
+    /* --- GLASSMORPHISM EFFECTS --- */
+    --glass-blur: 12px;
+    --glass-background: rgba(255, 255, 255, 0.75);
+    --glass-border: 1px solid rgba(255, 255, 255, 0.25);
+    --glass-box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.04);
+    
+    /* --- BORDER RADIUS --- */
+    --radius-xs: 6px;
+    --radius-sm: 10px;
+    --radius-md: 16px;
+    --radius-lg: 24px;               /* Main rounded cards in Sleek Interface */
+    --radius-xl: 32px;               /* Soft pill buttons and banners */
+    --radius-circle: 50%;
+
+    /* --- SPACING UNITS (8px Grid-based) --- */
+    --spacing-xs: 4px;
+    --spacing-sm: 8px;
+    --spacing-md: 16px;              /* Main density standard gap */
+    --spacing-lg: 24px;              /* Comfortable padding */
+    --spacing-xl: 32px;              /* Spacious margins */
+    --spacing-xxl: 48px;
+
+    /* --- TYPOGRAPHY (Modern, Clean Sans-Serif) --- */
+    --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+    
+    --font-size-xs: 0.75rem;          /* 12px */
+    --font-size-sm: 0.875rem;         /* 14px */
+    --font-size-base: 1rem;           /* 16px */
+    --font-size-lg: 1.125rem;         /* 18px */
+    --font-size-xl: 1.25rem;          /* 20px */
+    --font-size-xxl: 1.5rem;          /* 24px */
+    --font-size-display: 2rem;        /* 32px */
+    
+    --font-weight-light: 300;
+    --font-weight-normal: 400;
+    --font-weight-medium: 500;
+    --font-weight-semibold: 600;
+    --font-weight-bold: 700;
+    --font-weight-black: 900;
+
+    /* --- TRANSITIONS --- */
+    --transition-fast: 0.15s ease;
+    --transition-normal: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-slow: 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* --- UTILITY CLASSES DESIGNED FOR SYSTEM CONSOLE (CSS GRID & FLEXBOX) --- */
+
+/* Glassmorphic Card class */
+.glass-card {
+    background: var(--glass-background);
+    backdrop-filter: blur(var(--glass-blur));
+    -webkit-backdrop-filter: blur(var(--glass-blur));
+    border: var(--glass-border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--glass-box-shadow);
+    padding: var(--spacing-lg);
+    transition: transform var(--transition-normal), box-shadow var(--transition-normal);
+}
+
+.glass-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 40px 0 rgba(5, 150, 105, 0.08);
+}
+
+/* Responsive Grid System (CSS Grid) */
+.dashboard-grid {
+    display: grid;
+    grid-template-columns: repeat(12, 1fr);
+    gap: var(--spacing-lg);
+    width: 100%;
+}
+
+/* Column span utilities */
+.col-span-12 { grid-column: span 12; }
+.col-span-8  { grid-column: span 8; }
+.col-span-6  { grid-column: span 6; }
+.col-span-4  { grid-column: span 4; }
+.col-span-3  { grid-column: span 3; }
+
+/* Responsive adjustments */
+@media (max-width: 1024px) {
+    .col-span-8 { grid-column: span 12; }
+    .col-span-4 { grid-column: span 12; }
+}
+
+@media (max-width: 768px) {
+    .dashboard-grid {
+        grid-template-columns: 1fr;
+        gap: var(--spacing-md);
+    }
+    .col-span-6, .col-span-3 {
+        grid-column: span 12;
+    }
+}
+
+/* Sidebar Layout (Flexbox & CSS Grid Structure) */
+.dashboard-layout {
+    display: flex;
+    min-height: 100vh;
+    background-color: var(--color-bg-main);
+    font-family: var(--font-sans);
+    color: var(--color-text-primary);
+}
+
+.sidebar {
+    width: 260px;
+    background-color: var(--color-bg-sidebar);
+    border-right: 1px solid var(--color-border-light);
+    display: flex;
+    flex-direction: column;
+    padding: var(--spacing-lg) var(--spacing-md);
+    flex-shrink: 0;
+}
+
+.main-content {
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+}
+
+.top-navbar {
+    height: 70px;
+    background-color: var(--color-bg-sidebar);
+    border-bottom: 1px solid var(--color-border-light);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 var(--spacing-lg);
+}
