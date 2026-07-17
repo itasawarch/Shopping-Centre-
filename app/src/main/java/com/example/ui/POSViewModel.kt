@@ -1,6 +1,10 @@
 package com.example.ui
 
 import android.app.Application
+import android.net.ConnectivityManager
+import android.net.Network
+import android.net.NetworkCapabilities
+import android.net.NetworkRequest
 import androidx.compose.runtime.*
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -137,10 +141,23 @@ class POSViewModel(application: Application) : AndroidViewModel(application) {
     var syncing by mutableStateOf(false)
     var lastSyncSummary by mutableStateOf<SyncSummary?>(null)
 
+    // --- Network & Connection Sync State ---
+    var isOnline by mutableStateOf(true)
+    var isManualOffline by mutableStateOf(false)
+
+    val isSystemOnline: Boolean
+        get() = isOnline && !isManualOffline
+
+    private val connectivityManager = application.getSystemService(android.content.Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
+
     // --- Notifications Alert Feed ---
     val notifications = mutableStateListOf<String>()
 
     init {
+        // Initial connection check
+        isOnline = checkInitialNetworkState()
+        registerNetworkCallback()
+
         viewModelScope.launch {
             // Load sample data on startup
             repository.populateSampleDataIfEmpty()
@@ -425,6 +442,14 @@ class POSViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun editProduct(product: Product) {
+        viewModelScope.launch {
+            repository.updateProduct(product)
+            addNotification("📦 Product Updated: ${product.name}")
+            refreshAlerts()
+        }
+    }
+
     // --- Customer Operations ---
     fun addCustomer(name: String, phone: String, email: String, address: String) {
         viewModelScope.launch {
@@ -524,6 +549,10 @@ class POSViewModel(application: Application) : AndroidViewModel(application) {
     // --- Simulated Firebase Cloud Synced Indicator ---
     fun syncWithCloud() {
         if (syncing) return
+        if (!isSystemOnline) {
+            addNotification("⚠️ Cannot sync: System is currently OFFLINE.")
+            return
+        }
         syncing = true
         addNotification("🔄 Syncing SQLite data with Firebase Cloud Firestore...")
         viewModelScope.launch {
@@ -531,6 +560,34 @@ class POSViewModel(application: Application) : AndroidViewModel(application) {
             lastSyncSummary = summary
             syncing = false
             addNotification("✅ Sync Complete: ${summary.totalSynced} records safely synced to Firestore cloud!")
+        }
+    }
+
+    private fun checkInitialNetworkState(): Boolean {
+        if (connectivityManager == null) return false
+        val network = connectivityManager.activeNetwork ?: return false
+        val capabilities = connectivityManager.getNetworkCapabilities(network) ?: return false
+        return capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+    }
+
+    private fun registerNetworkCallback() {
+        if (connectivityManager == null) return
+        val builder = NetworkRequest.Builder()
+            .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+        try {
+            connectivityManager.registerNetworkCallback(
+                builder.build(),
+                object : ConnectivityManager.NetworkCallback() {
+                    override fun onAvailable(network: Network) {
+                        isOnline = true
+                    }
+                    override fun onLost(network: Network) {
+                        isOnline = false
+                    }
+                }
+            )
+        } catch (e: Exception) {
+            e.printStackTrace()
         }
     }
 

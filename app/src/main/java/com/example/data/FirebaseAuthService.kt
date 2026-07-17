@@ -45,10 +45,11 @@ class FirebaseAuthService(
         if (user == null) return false
         if (requiredRole == null) return true
         
-        // Roles hierarchy: admin has access to everything, cashiers are restricted
+        // Roles hierarchy: admin has access to everything, manager has elevated operations, cashiers/employees are restricted
         return when (requiredRole.uppercase()) {
             "ADMIN" -> user.role.uppercase() == "ADMIN"
-            "CASHIER" -> user.role.uppercase() == "CASHIER" || user.role.uppercase() == "ADMIN"
+            "MANAGER" -> user.role.uppercase() == "ADMIN" || user.role.uppercase() == "MANAGER"
+            "CASHIER" -> user.role.uppercase() == "ADMIN" || user.role.uppercase() == "MANAGER" || user.role.uppercase() == "CASHIER"
             else -> true
         }
     }

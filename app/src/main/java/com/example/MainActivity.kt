@@ -32,6 +32,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.example.ui.*
+import com.example.ui.components.*
 import com.example.ui.screens.*
 import com.example.ui.theme.MyApplicationTheme
 
@@ -69,139 +70,96 @@ fun MainTerminalLayout(viewModel: POSViewModel) {
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
     val isTablet = configuration.screenWidthDp >= 600
+    val isWideScreen = isTablet || isLandscape
 
     var showNotificationsDialog by remember { mutableStateOf(false) }
+    var isDrawerOpen by remember { mutableStateOf(false) }
 
-    Scaffold(
-        topBar = {
-            if (viewModel.currentTab != com.example.ui.MainTab.DASHBOARD) {
-                TopAppBar(
-                    title = {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(32.dp)
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(Color(0xFF10B981)),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(Icons.Default.Storefront, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
-                            }
-                            Column {
-                                Text(
-                                    text = viewModel.shopName,
-                                    fontSize = 15.sp,
-                                    fontWeight = FontWeight.Black,
-                                    color = MaterialTheme.colorScheme.onBackground,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                                Text(
-                                    text = "POS Terminal Active • PKR Currency",
-                                    fontSize = 10.sp,
-                                    color = Color.Gray
-                                )
-                            }
-                        }
-                    },
-                    actions = {
-                        // System online / offline sync status indicator
-                        Row(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(20.dp))
-                                .background(Color(0xFFECFDF5))
-                                .padding(horizontal = 8.dp, vertical = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(8.dp)
-                                    .background(Color(0xFF10B981), CircleShape)
-                            )
-                            Text("Cloud Synced", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = Color(0xFF047857))
-                        }
-
-                        Spacer(modifier = Modifier.width(12.dp))
-
-                        // Notifications bell trigger showing low-stock warnings
-                        Box {
-                            IconButton(onClick = { showNotificationsDialog = true }, modifier = Modifier.testTag("bell_icon")) {
-                                Icon(Icons.Default.Notifications, contentDescription = "Alerts")
-                            }
-                            if (viewModel.notifications.isNotEmpty()) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(8.dp)
-                                        .background(Color.Red, CircleShape)
-                                        .align(Alignment.TopEnd)
-                                        .offset(x = (-6).dp, y = (6).dp)
-                                )
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.width(12.dp))
-
-                        // Logout Button
-                        IconButton(onClick = { viewModel.performLogout() }, modifier = Modifier.testTag("logout_button")) {
-                            Icon(Icons.Default.ExitToApp, contentDescription = "Logout", tint = Color.Red)
-                        }
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.surface,
-                        titleContentColor = MaterialTheme.colorScheme.onSurface
-                    ),
-                    modifier = Modifier.border(0.dp, Color(0xFFE2E8F0)).testTag("top_app_bar")
+    Box(modifier = Modifier.fillMaxSize()) {
+        Scaffold(
+            topBar = {
+                SleekTopNavbar(
+                    viewModel = viewModel,
+                    onMenuClick = { isDrawerOpen = !isDrawerOpen },
+                    onNotificationsClick = { showNotificationsDialog = true }
                 )
+            },
+            bottomBar = {
+                // Only draw standard bottom navigation bar if in portrait/mobile view
+                if (!isWideScreen) {
+                    SleekBottomBar(viewModel)
+                }
             }
-        },
-        bottomBar = {
-            // Only draw standard bottom navigation bar if in portrait/mobile view
-            if (!isLandscape && !isTablet) {
-                BottomNavigationBar(viewModel)
-            }
-        }
-    ) { innerPadding ->
-        Row(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-        ) {
-            // Draw left-hand Navigation Rail/Sidebar if wide screen or landscape
-            if (isLandscape || isTablet) {
-                NavigationSidebar(viewModel)
-            }
-
-            // Central tab-based screen rendering frame (With Firebase Protected Route Check)
-            Box(
+        ) { innerPadding ->
+            Row(
                 modifier = Modifier
-                    .weight(1f)
-                    .fillMaxHeight()
-                    .background(MaterialTheme.colorScheme.background)
+                    .fillMaxSize()
+                    .padding(innerPadding)
             ) {
-                val hasAccess = when (viewModel.currentTab) {
-                    MainTab.REPORTS, MainTab.SETTINGS -> {
-                        viewModel.firebaseAuthService.isAuthorized(viewModel.loggedInUser, "ADMIN")
-                    }
-                    else -> true
+                // Draw left-hand Navigation Rail/Sidebar if wide screen or landscape
+                if (isWideScreen) {
+                    SleekSidebar(viewModel)
                 }
 
-                if (hasAccess) {
-                    when (viewModel.currentTab) {
-                        MainTab.DASHBOARD -> DashboardTab(viewModel)
-                        MainTab.POS -> POSTab(viewModel)
-                        MainTab.PRODUCTS -> ProductsTab(viewModel)
-                        MainTab.CUSTOMERS -> CustomersSuppliersTab(viewModel)
-                        MainTab.EXPENSES -> ExpensesTab(viewModel)
-                        MainTab.REPORTS -> ReportsTab(viewModel)
-                        MainTab.SETTINGS -> SettingsTab(viewModel)
-                        else -> DashboardTab(viewModel)
+                // Central tab-based screen rendering frame (With Firebase Protected Route Check)
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .background(MaterialTheme.colorScheme.background)
+                ) {
+                    val hasAccess = when (viewModel.currentTab) {
+                        MainTab.SETTINGS -> {
+                            viewModel.firebaseAuthService.isAuthorized(viewModel.loggedInUser, "ADMIN")
+                        }
+                        MainTab.REPORTS, MainTab.PRODUCTS, MainTab.EXPENSES -> {
+                            viewModel.firebaseAuthService.isAuthorized(viewModel.loggedInUser, "MANAGER")
+                        }
+                        else -> true
                     }
-                } else {
-                    SecurityAccessDeniedScreen(viewModel)
+
+                    if (hasAccess) {
+                        when (viewModel.currentTab) {
+                            MainTab.DASHBOARD -> DashboardTab(viewModel)
+                            MainTab.POS -> POSTab(viewModel)
+                            MainTab.PRODUCTS -> ProductsTab(viewModel)
+                            MainTab.CUSTOMERS -> CustomersSuppliersTab(viewModel)
+                            MainTab.EXPENSES -> ExpensesTab(viewModel)
+                            MainTab.REPORTS -> ReportsTab(viewModel)
+                            MainTab.SETTINGS -> SettingsTab(viewModel)
+                            else -> DashboardTab(viewModel)
+                        }
+                    } else {
+                        SecurityAccessDeniedScreen(viewModel)
+                    }
+                }
+            }
+        }
+
+        // Slide-out Drawer Sidebar on Mobile
+        AnimatedVisibility(
+            visible = !isWideScreen && isDrawerOpen,
+            enter = fadeIn() + slideInHorizontally(initialOffsetX = { -it }),
+            exit = fadeOut() + slideOutHorizontally(targetOffsetX = { -it })
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.5f))
+                    .clickable { isDrawerOpen = false }
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxHeight()
+                        .width(260.dp)
+                        .background(Color.White)
+                        .clickable(enabled = false) {} // prevent clicking behind
+                        .align(Alignment.CenterStart)
+                ) {
+                    SleekSidebar(
+                        viewModel = viewModel,
+                        onClose = { isDrawerOpen = false }
+                    )
                 }
             }
         }
@@ -267,174 +225,7 @@ fun MainTerminalLayout(viewModel: POSViewModel) {
     }
 }
 
-@Composable
-fun NavigationSidebar(viewModel: POSViewModel) {
-    Box(
-        modifier = Modifier
-            .width(240.dp)
-            .fillMaxHeight()
-            .background(MaterialTheme.colorScheme.surface)
-            .border(width = (0.5).dp, color = Color(0xFFE2E8F0), shape = RoundedCornerShape(0.dp))
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 16.dp, vertical = 20.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            // Elegant Sidebar Brand Header
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(start = 8.dp, end = 8.dp, bottom = 16.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(36.dp)
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(Color(0xFF059669)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Storefront,
-                        contentDescription = null,
-                        tint = Color.White,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-                Column {
-                    Text(
-                        text = "ZamZam ERP",
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.Black,
-                        color = Color(0xFF1E293B)
-                    )
-                    Text(
-                        text = "System Console",
-                        fontSize = 10.sp,
-                        color = Color.Gray,
-                        fontWeight = FontWeight.Medium
-                    )
-                }
-            }
 
-            Divider(color = Color(0xFFF1F5F9), modifier = Modifier.padding(bottom = 8.dp))
-
-            Text(
-                text = "TERMINAL NAVIGATION",
-                fontSize = 10.sp,
-                color = Color.Gray,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(start = 12.dp, bottom = 8.dp)
-            )
-
-            val menuItems = listOf(
-                SidebarMenuItem("Dashboard", Icons.Default.Dashboard, MainTab.DASHBOARD),
-                SidebarMenuItem("POS Billing", Icons.Default.ShoppingCart, MainTab.POS),
-                SidebarMenuItem("Inventory", Icons.Default.Inventory, MainTab.PRODUCTS),
-                SidebarMenuItem("Ledger Partners", Icons.Default.People, MainTab.CUSTOMERS),
-                SidebarMenuItem("Expenses", Icons.Default.MoneyOff, MainTab.EXPENSES),
-                SidebarMenuItem("Audit & Reports", Icons.Default.Analytics, MainTab.REPORTS),
-                SidebarMenuItem("Settings", Icons.Default.Settings, MainTab.SETTINGS)
-            )
-
-            menuItems.forEach { item ->
-                val isSelected = viewModel.currentTab == item.tab
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(if (isSelected) Color(0xFF059669) else Color.Transparent)
-                        .clickable { viewModel.currentTab = item.tab }
-                        .padding(horizontal = 14.dp, vertical = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        imageVector = item.icon,
-                        contentDescription = item.title,
-                        tint = if (isSelected) Color.White else Color.DarkGray,
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Text(
-                        text = item.title,
-                        fontSize = 13.sp,
-                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                        color = if (isSelected) Color.White else Color.DarkGray
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.weight(1f))
-
-            // Footer user info
-            Divider(color = Color(0xFFF1F5F9), modifier = Modifier.padding(vertical = 8.dp))
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(36.dp)
-                        .background(Color(0xFF10B981), CircleShape),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = viewModel.loggedInUser?.displayName?.take(1) ?: "U",
-                        color = Color.White,
-                        fontWeight = FontWeight.Black,
-                        fontSize = 14.sp
-                    )
-                }
-                Spacer(modifier = Modifier.width(10.dp))
-                Column {
-                    Text(viewModel.loggedInUser?.displayName ?: "User", fontSize = 12.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text(viewModel.loggedInUser?.role ?: "Cashier", fontSize = 10.sp, color = Color.Gray)
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun BottomNavigationBar(viewModel: POSViewModel) {
-    NavigationBar(
-        containerColor = MaterialTheme.colorScheme.surface,
-        modifier = Modifier.windowInsetsPadding(WindowInsets.navigationBars)
-    ) {
-        val items = listOf(
-            BottomMenuItem("Dashboard", Icons.Default.Dashboard, MainTab.DASHBOARD),
-            BottomMenuItem("POS", Icons.Default.ShoppingCart, MainTab.POS),
-            BottomMenuItem("Stock", Icons.Default.Inventory, MainTab.PRODUCTS),
-            BottomMenuItem("Ledgers", Icons.Default.People, MainTab.CUSTOMERS),
-            BottomMenuItem("Reports", Icons.Default.Analytics, MainTab.REPORTS)
-        )
-
-        items.forEach { item ->
-            val isSelected = viewModel.currentTab == item.tab
-            NavigationBarItem(
-                selected = isSelected,
-                onClick = { viewModel.currentTab = item.tab },
-                icon = { Icon(item.icon, contentDescription = item.title) },
-                label = { Text(item.title, fontSize = 10.sp) },
-                colors = NavigationBarItemDefaults.colors(
-                    selectedIconColor = Color.White,
-                    selectedTextColor = Color(0xFF059669),
-                    indicatorColor = Color(0xFF059669),
-                    unselectedIconColor = Color.Gray,
-                    unselectedTextColor = Color.Gray
-                )
-            )
-        }
-    }
-}
-
-data class SidebarMenuItem(val title: String, val icon: ImageVector, val tab: MainTab)
-data class BottomMenuItem(val title: String, val icon: ImageVector, val tab: MainTab)
 
 @Composable
 fun SecurityAccessDeniedScreen(viewModel: POSViewModel) {

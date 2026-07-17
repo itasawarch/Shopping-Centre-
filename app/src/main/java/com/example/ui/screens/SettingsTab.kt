@@ -162,6 +162,30 @@ fun SettingsTab(viewModel: POSViewModel) {
                         )
                     }
 
+                    Divider(color = Color(0xFFF1F5F9))
+
+                    // Simulated/Manual Offline Mode
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
+                            Text("Simulate Offline Mode", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                            Text("Force the POS terminal to run offline", fontSize = 11.sp, color = Color.Gray)
+                        }
+
+                        Switch(
+                            checked = viewModel.isManualOffline,
+                            onCheckedChange = { viewModel.isManualOffline = it },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = Color(0xFFEF4444),
+                                checkedTrackColor = Color(0xFFFEF2F2)
+                            ),
+                            modifier = Modifier.testTag("offline_mode_switch")
+                        )
+                    }
+
                     // Receipt Selector
                     Row(
                         modifier = Modifier.fillMaxWidth(),

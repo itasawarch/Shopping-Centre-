@@ -32,7 +32,14 @@ data class AuthSession(
     val isActive: Boolean = true
 )
 
-@Entity(tableName = "products")
+@Entity(
+    tableName = "products",
+    indices = [
+        Index(value = ["sku"], unique = true),
+        Index(value = ["barcode"]),
+        Index(value = ["category"])
+    ]
+)
 data class Product(
     @PrimaryKey val id: String = UUID.randomUUID().toString(),
     val name: String,
@@ -139,19 +146,67 @@ sealed class ProductValidationResult {
     data class Error(val message: String) : ProductValidationResult()
 }
 
-@Entity(tableName = "customers")
+@Entity(
+    tableName = "customers",
+    indices = [Index(value = ["phone"])]
+)
 data class Customer(
     @PrimaryKey val id: String = UUID.randomUUID().toString(),
     val name: String,
     val phone: String,
     val email: String,
     val address: String,
-    val balance: Double = 0.0, // negative is debit, positive is credit (or vice versa)
+    val balance: Double = 0.0, // negative is debit, positive is credit
     val isSynced: Boolean = false,
     val lastUpdated: Long = System.currentTimeMillis()
-)
+) {
+    fun hasOutstandingDues(): Boolean = balance < 0.0
+    fun getAbsoluteBalance(): Double = kotlin.math.abs(balance)
 
-@Entity(tableName = "suppliers")
+    fun toFirestoreMap(): Map<String, Any?> {
+        return mapOf(
+            "id" to id,
+            "name" to name,
+            "phone" to phone,
+            "email" to email,
+            "address" to address,
+            "balance" to balance,
+            "lastUpdated" to lastUpdated
+        )
+    }
+
+    companion object {
+        fun fromFirestoreMap(id: String, map: Map<String, Any?>): Customer {
+            return Customer(
+                id = id,
+                name = map["name"] as? String ?: "",
+                phone = map["phone"] as? String ?: "",
+                email = map["email"] as? String ?: "",
+                address = map["address"] as? String ?: "",
+                balance = (map["balance"] as? Number)?.toDouble() ?: 0.0,
+                isSynced = true,
+                lastUpdated = (map["lastUpdated"] as? Number)?.toLong() ?: System.currentTimeMillis()
+            )
+        }
+
+        fun validate(name: String, phone: String, email: String): CustomerValidationResult {
+            if (name.isBlank()) return CustomerValidationResult.Error("Customer name is required")
+            if (phone.isBlank()) return CustomerValidationResult.Error("Phone number is required")
+            if (email.isNotBlank() && !email.contains("@")) return CustomerValidationResult.Error("Invalid email address format")
+            return CustomerValidationResult.Valid
+        }
+    }
+}
+
+sealed class CustomerValidationResult {
+    object Valid : CustomerValidationResult()
+    data class Error(val message: String) : CustomerValidationResult()
+}
+
+@Entity(
+    tableName = "suppliers",
+    indices = [Index(value = ["phone"])]
+)
 data class Supplier(
     @PrimaryKey val id: String = UUID.randomUUID().toString(),
     val name: String,
@@ -161,9 +216,54 @@ data class Supplier(
     val balance: Double = 0.0,
     val isSynced: Boolean = false,
     val lastUpdated: Long = System.currentTimeMillis()
-)
+) {
+    fun toFirestoreMap(): Map<String, Any?> {
+        return mapOf(
+            "id" to id,
+            "name" to name,
+            "phone" to phone,
+            "email" to email,
+            "address" to address,
+            "balance" to balance,
+            "lastUpdated" to lastUpdated
+        )
+    }
 
-@Entity(tableName = "sales")
+    companion object {
+        fun fromFirestoreMap(id: String, map: Map<String, Any?>): Supplier {
+            return Supplier(
+                id = id,
+                name = map["name"] as? String ?: "",
+                phone = map["phone"] as? String ?: "",
+                email = map["email"] as? String ?: "",
+                address = map["address"] as? String ?: "",
+                balance = (map["balance"] as? Number)?.toDouble() ?: 0.0,
+                isSynced = true,
+                lastUpdated = (map["lastUpdated"] as? Number)?.toLong() ?: System.currentTimeMillis()
+            )
+        }
+
+        fun validate(name: String, phone: String, email: String): SupplierValidationResult {
+            if (name.isBlank()) return SupplierValidationResult.Error("Supplier name is required")
+            if (phone.isBlank()) return SupplierValidationResult.Error("Phone number is required")
+            if (email.isNotBlank() && !email.contains("@")) return SupplierValidationResult.Error("Invalid email address format")
+            return SupplierValidationResult.Valid
+        }
+    }
+}
+
+sealed class SupplierValidationResult {
+    object Valid : SupplierValidationResult()
+    data class Error(val message: String) : SupplierValidationResult()
+}
+
+@Entity(
+    tableName = "sales",
+    indices = [
+        Index(value = ["timestamp"]),
+        Index(value = ["customerId"])
+    ]
+)
 data class Sale(
     @PrimaryKey val id: String = UUID.randomUUID().toString(),
     val timestamp: Long = System.currentTimeMillis(),
@@ -173,13 +273,65 @@ data class Sale(
     val discount: Double,
     val tax: Double,
     val totalAmount: Double,
-    val paymentMethod: String, // "Cash", "Card", "JazzCash", "EasyPaisa", "Bank Transfer"
+    val paymentMethod: String, // "Cash", "Card", "JazzCash", "EasyPaisa", "Bank Transfer", "On Credit"
     val cashierName: String,
     val status: String = "Completed", // "Completed", "On Hold", "Returned"
     val isSynced: Boolean = false
-)
+) {
+    fun toFirestoreMap(): Map<String, Any?> {
+        return mapOf(
+            "id" to id,
+            "timestamp" to timestamp,
+            "customerId" to customerId,
+            "customerName" to customerName,
+            "subtotal" to subtotal,
+            "discount" to discount,
+            "tax" to tax,
+            "totalAmount" to totalAmount,
+            "paymentMethod" to paymentMethod,
+            "cashierName" to cashierName,
+            "status" to status
+        )
+    }
 
-@Entity(tableName = "sale_items")
+    companion object {
+        fun fromFirestoreMap(id: String, map: Map<String, Any?>): Sale {
+            return Sale(
+                id = id,
+                timestamp = (map["timestamp"] as? Number)?.toLong() ?: System.currentTimeMillis(),
+                customerId = map["customerId"] as? String ?: "GUEST",
+                customerName = map["customerName"] as? String ?: "Guest Customer",
+                subtotal = (map["subtotal"] as? Number)?.toDouble() ?: 0.0,
+                discount = (map["discount"] as? Number)?.toDouble() ?: 0.0,
+                tax = (map["tax"] as? Number)?.toDouble() ?: 0.0,
+                totalAmount = (map["totalAmount"] as? Number)?.toDouble() ?: 0.0,
+                paymentMethod = map["paymentMethod"] as? String ?: "Cash",
+                cashierName = map["cashierName"] as? String ?: "Cashier",
+                status = map["status"] as? String ?: "Completed",
+                isSynced = true
+            )
+        }
+
+        fun validate(totalAmount: Double, paymentMethod: String): SaleValidationResult {
+            if (totalAmount <= 0) return SaleValidationResult.Error("Total sale amount must be greater than zero")
+            if (paymentMethod.isBlank()) return SaleValidationResult.Error("Payment method must be selected")
+            return SaleValidationResult.Valid
+        }
+    }
+}
+
+sealed class SaleValidationResult {
+    object Valid : SaleValidationResult()
+    data class Error(val message: String) : SaleValidationResult()
+}
+
+@Entity(
+    tableName = "sale_items",
+    indices = [
+        Index(value = ["saleId"]),
+        Index(value = ["productId"])
+    ]
+)
 data class SaleItem(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,
     val saleId: String,
@@ -189,9 +341,44 @@ data class SaleItem(
     val purchasePrice: Double, // Cost price at time of sale
     val salePrice: Double, // Selling price at time of sale
     val totalLinePrice: Double
-)
+) {
+    fun getLineProfit(): Double = totalLinePrice - (purchasePrice * quantity)
+    fun getLineCost(): Double = purchasePrice * quantity
 
-@Entity(tableName = "purchases")
+    fun toFirestoreMap(): Map<String, Any?> {
+        return mapOf(
+            "saleId" to saleId,
+            "productId" to productId,
+            "productName" to productName,
+            "quantity" to quantity,
+            "purchasePrice" to purchasePrice,
+            "salePrice" to salePrice,
+            "totalLinePrice" to totalLinePrice
+        )
+    }
+
+    companion object {
+        fun fromFirestoreMap(map: Map<String, Any?>): SaleItem {
+            return SaleItem(
+                saleId = map["saleId"] as? String ?: "",
+                productId = map["productId"] as? String ?: "",
+                productName = map["productName"] as? String ?: "",
+                quantity = (map["quantity"] as? Number)?.toInt() ?: 0,
+                purchasePrice = (map["purchasePrice"] as? Number)?.toDouble() ?: 0.0,
+                salePrice = (map["salePrice"] as? Number)?.toDouble() ?: 0.0,
+                totalLinePrice = (map["totalLinePrice"] as? Number)?.toDouble() ?: 0.0
+            )
+        }
+    }
+}
+
+@Entity(
+    tableName = "purchases",
+    indices = [
+        Index(value = ["timestamp"]),
+        Index(value = ["supplierId"])
+    ]
+)
 data class Purchase(
     @PrimaryKey val id: String = UUID.randomUUID().toString(),
     val timestamp: Long = System.currentTimeMillis(),
@@ -202,7 +389,13 @@ data class Purchase(
     val isSynced: Boolean = false
 )
 
-@Entity(tableName = "purchase_items")
+@Entity(
+    tableName = "purchase_items",
+    indices = [
+        Index(value = ["purchaseId"]),
+        Index(value = ["productId"])
+    ]
+)
 data class PurchaseItem(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,
     val purchaseId: String,
@@ -213,7 +406,12 @@ data class PurchaseItem(
     val totalLinePrice: Double
 )
 
-@Entity(tableName = "expenses")
+@Entity(
+    tableName = "expenses",
+    indices = [
+        Index(value = ["timestamp"])
+    ]
+)
 data class Expense(
     @PrimaryKey val id: String = UUID.randomUUID().toString(),
     val category: String,
@@ -223,7 +421,12 @@ data class Expense(
     val isSynced: Boolean = false
 )
 
-@Entity(tableName = "audit_logs")
+@Entity(
+    tableName = "audit_logs",
+    indices = [
+        Index(value = ["timestamp"])
+    ]
+)
 data class AuditLog(
     @PrimaryKey val id: String = UUID.randomUUID().toString(),
     val timestamp: Long = System.currentTimeMillis(),
@@ -498,7 +701,7 @@ interface POSDao {
         Expense::class,
         AuditLog::class
     ],
-    version = 2,
+    version = 4,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {

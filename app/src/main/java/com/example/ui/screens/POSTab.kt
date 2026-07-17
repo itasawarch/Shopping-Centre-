@@ -21,6 +21,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -35,6 +36,7 @@ import com.example.data.Product
 import com.example.data.Sale
 import com.example.data.SaleItem
 import com.example.ui.POSViewModel
+import com.example.ui.components.ReceiptPrinter
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -618,12 +620,18 @@ fun POSTab(viewModel: POSViewModel) {
                                 Text("Dismiss", fontSize = 12.sp)
                             }
 
+                            val context = LocalContext.current
                             Button(
                                 onClick = {
-                                    // Simulated print trigger
+                                    ReceiptPrinter.printReceipt(
+                                        context = context,
+                                        sale = sale,
+                                        items = items,
+                                        viewModel = viewModel
+                                    )
                                 },
                                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF007A48)),
-                                modifier = Modifier.weight(1.2f)
+                                modifier = Modifier.weight(1.2f).testTag("print_pdf_button")
                             ) {
                                 Icon(Icons.Default.Print, contentDescription = null, modifier = Modifier.size(16.dp))
                                 Spacer(modifier = Modifier.width(4.dp))

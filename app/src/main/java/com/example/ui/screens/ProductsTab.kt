@@ -33,6 +33,7 @@ fun ProductsTab(viewModel: POSViewModel) {
     val productsList by viewModel.products.collectAsState()
 
     var showAddDialog by remember { mutableStateOf(false) }
+    var showEditDialogForProduct by remember { mutableStateOf<Product?>(null) }
 
     // Dropdown list categories
     val categories = listOf("All", "Groceries", "Beverages", "Cooking Essentials", "Personal Care", "Snacks")
@@ -190,9 +191,11 @@ fun ProductsTab(viewModel: POSViewModel) {
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 items(filteredList) { product ->
-                    ProductRowCard(product, onDelete = {
-                        viewModel.deleteProduct(product)
-                    })
+                    ProductRowCard(
+                        product = product,
+                        onEdit = { showEditDialogForProduct = product },
+                        onDelete = { viewModel.deleteProduct(product) }
+                    )
                 }
             }
         }
@@ -221,10 +224,22 @@ fun ProductsTab(viewModel: POSViewModel) {
             }
         )
     }
+
+    // Edit Product Modal Dialog
+    showEditDialogForProduct?.let { productToEdit ->
+        EditProductDialog(
+            product = productToEdit,
+            onDismiss = { showEditDialogForProduct = null },
+            onSave = { updatedProduct ->
+                viewModel.editProduct(updatedProduct)
+                showEditDialogForProduct = null
+            }
+        )
+    }
 }
 
 @Composable
-fun ProductRowCard(product: Product, onDelete: () -> Unit) {
+fun ProductRowCard(product: Product, onEdit: () -> Unit, onDelete: () -> Unit) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -292,9 +307,15 @@ fun ProductRowCard(product: Product, onDelete: () -> Unit) {
             ) {
                 Text("Expiry: ${product.expiryDate}", fontSize = 11.sp, color = Color.Gray)
                 
-                // Delete Trigger
-                IconButton(onClick = onDelete, modifier = Modifier.size(28.dp)) {
-                    Icon(Icons.Default.Delete, contentDescription = null, tint = Color.Red, modifier = Modifier.size(18.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    // Edit Trigger
+                    IconButton(onClick = onEdit, modifier = Modifier.size(28.dp).testTag("edit_product_button")) {
+                        Icon(Icons.Default.Edit, contentDescription = "Edit Product", tint = Color(0xFF007A48), modifier = Modifier.size(18.dp))
+                    }
+                    // Delete Trigger
+                    IconButton(onClick = onDelete, modifier = Modifier.size(28.dp).testTag("delete_product_button")) {
+                        Icon(Icons.Default.Delete, contentDescription = "Delete Product", tint = Color.Red, modifier = Modifier.size(18.dp))
+                    }
                 }
             }
         }
@@ -504,6 +525,222 @@ fun AddProductDialog(onDismiss: () -> Unit, onSave: (String, String, String, Str
                             modifier = Modifier.weight(1.2f).testTag("save_product_btn")
                         ) {
                             Text("Save Product")
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun EditProductDialog(
+    product: Product,
+    onDismiss: () -> Unit,
+    onSave: (Product) -> Unit
+) {
+    var name by remember { mutableStateOf(product.name) }
+    var sku by remember { mutableStateOf(product.sku) }
+    var barcode by remember { mutableStateOf(product.barcode) }
+    var category by remember { mutableStateOf(product.category) }
+    var brand by remember { mutableStateOf(product.brand) }
+    var unit by remember { mutableStateOf(product.unit) }
+    var purchasePrice by remember { mutableStateOf(product.purchasePrice.toString()) }
+    var retailPrice by remember { mutableStateOf(product.retailPrice.toString()) }
+    var wholesalePrice by remember { mutableStateOf(product.wholesalePrice.toString()) }
+    var stockQty by remember { mutableStateOf(product.stockQuantity.toString()) }
+    var alertLevel by remember { mutableStateOf(product.minStockAlert.toString()) }
+    var expiry by remember { mutableStateOf(product.expiryDate) }
+
+    val categories = listOf("Groceries", "Beverages", "Cooking Essentials", "Personal Care", "Snacks")
+
+    Dialog(onDismissRequest = onDismiss) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .fillMaxHeight(0.9f),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.White)
+        ) {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(20.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                item {
+                    Text("Edit Inventory Product", fontSize = 18.sp, fontWeight = FontWeight.Black, color = Color(0xFF007A48))
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
+
+                item {
+                    OutlinedTextField(
+                        value = name,
+                        onValueChange = { name = it },
+                        label = { Text("Product Name *") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth().testTag("edit_prod_name")
+                    )
+                }
+
+                item {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedTextField(
+                            value = sku,
+                            onValueChange = { sku = it },
+                            label = { Text("SKU *") },
+                            singleLine = true,
+                            modifier = Modifier.weight(1f)
+                        )
+                        OutlinedTextField(
+                            value = barcode,
+                            onValueChange = { barcode = it },
+                            label = { Text("Barcode") },
+                            singleLine = true,
+                            modifier = Modifier.weight(1.2f)
+                        )
+                    }
+                }
+
+                item {
+                    Text("Select Category:", fontSize = 11.sp, color = Color.Gray, fontWeight = FontWeight.Bold)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        categories.take(3).forEach { cat ->
+                            val isSel = category == cat
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(if (isSel) Color(0xFF007A48) else Color(0xFFEDF2F7))
+                                    .clickable { category = cat }
+                                    .padding(vertical = 8.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(cat, fontSize = 10.sp, color = if (isSel) Color.White else Color.Black, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+                }
+
+                item {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedTextField(
+                            value = brand,
+                            onValueChange = { brand = it },
+                            label = { Text("Brand") },
+                            singleLine = true,
+                            modifier = Modifier.weight(1f)
+                        )
+                        OutlinedTextField(
+                            value = unit,
+                            onValueChange = { unit = it },
+                            label = { Text("Unit (Kg, Pack)") },
+                            singleLine = true,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                }
+
+                item {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedTextField(
+                            value = purchasePrice,
+                            onValueChange = { purchasePrice = it },
+                            label = { Text("Purchase Price") },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            singleLine = true,
+                            modifier = Modifier.weight(1f)
+                        )
+                        OutlinedTextField(
+                            value = retailPrice,
+                            onValueChange = { retailPrice = it },
+                            label = { Text("Retail Price *") },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            singleLine = true,
+                            modifier = Modifier.weight(1f).testTag("edit_prod_retail")
+                        )
+                    }
+                }
+
+                item {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedTextField(
+                            value = wholesalePrice,
+                            onValueChange = { wholesalePrice = it },
+                            label = { Text("Wholesale Price") },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            singleLine = true,
+                            modifier = Modifier.weight(1f)
+                        )
+                        OutlinedTextField(
+                            value = stockQty,
+                            onValueChange = { stockQty = it },
+                            label = { Text("Stock Qty *") },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            singleLine = true,
+                            modifier = Modifier.weight(1f).testTag("edit_prod_stock")
+                        )
+                    }
+                }
+
+                item {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedTextField(
+                            value = alertLevel,
+                            onValueChange = { alertLevel = it },
+                            label = { Text("Min Stock Alert") },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            singleLine = true,
+                            modifier = Modifier.weight(1f)
+                        )
+                        OutlinedTextField(
+                            value = expiry,
+                            onValueChange = { expiry = it },
+                            placeholder = { Text("YYYY-MM-DD") },
+                            label = { Text("Expiry Date") },
+                            singleLine = true,
+                            modifier = Modifier.weight(1.2f)
+                        )
+                    }
+                }
+
+                item {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        OutlinedButton(onClick = onDismiss, modifier = Modifier.weight(1f)) {
+                            Text("Cancel")
+                        }
+                        Button(
+                            onClick = {
+                                if (name.isNotBlank() && retailPrice.isNotBlank() && stockQty.isNotBlank()) {
+                                    val updated = product.copy(
+                                        name = name,
+                                        sku = sku,
+                                        barcode = barcode,
+                                        category = category,
+                                        brand = brand,
+                                        unit = unit,
+                                        purchasePrice = purchasePrice.toDoubleOrNull() ?: 0.0,
+                                        retailPrice = retailPrice.toDoubleOrNull() ?: 0.0,
+                                        wholesalePrice = wholesalePrice.toDoubleOrNull() ?: 0.0,
+                                        stockQuantity = stockQty.toIntOrNull() ?: 0,
+                                        minStockAlert = alertLevel.toIntOrNull() ?: 5,
+                                        expiryDate = expiry,
+                                        lastUpdated = System.currentTimeMillis()
+                                    )
+                                    onSave(updated)
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF007A48)),
+                            modifier = Modifier.weight(1.2f).testTag("save_edited_product_btn")
+                        ) {
+                            Text("Save Changes")
                         }
                     }
                 }
