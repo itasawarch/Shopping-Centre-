@@ -1,14 +1,11 @@
 package com.example.ui
 
 import android.app.Application
-import android.net.ConnectivityManager
-import android.net.Network
-import android.net.NetworkCapabilities
-import android.net.NetworkRequest
 import androidx.compose.runtime.*
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.data.*
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
@@ -21,8 +18,32 @@ enum class Screen {
 }
 
 enum class MainTab {
-    DASHBOARD, POS, PRODUCTS, CUSTOMERS, SUPPLIERS, EXPENSES, REPORTS, SETTINGS
+    DASHBOARD, // Home Tab
+    POS,       // Portfolio / Projects Tab
+    PRODUCTS,  // Services Tab
+    CUSTOMERS, // Skills Tab
+    SUPPLIERS, // Experience Timeline Tab
+    EXPENSES,  // Blog Tab
+    REPORTS,   // Contact & Location Tab
+    SETTINGS   // Admin Settings, SQL Diagnostics, and Theme Options
 }
+
+// Custom theme schemes supported
+enum class AppColorScheme {
+    CLASSIC_BLUE,    // Professional bright corporate blue
+    MIDNIGHT_NAVY,   // Deep elegant navy
+    ROYAL_SAPPHIRE,  // Premium dark rich sapphire
+    EMERALD_MINT,    // Cool modern green-blue
+    SLATE_MINIMALIST // High-contrast clean dark slate
+}
+
+// Chat message format for Live Assistant
+data class ChatMessage(
+    val id: String = UUID.randomUUID().toString(),
+    val sender: String, // "Visitor" or "AI_Assistant"
+    val text: String,
+    val timestamp: Long = System.currentTimeMillis()
+)
 
 class POSViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -34,8 +55,50 @@ class POSViewModel(application: Application) : AndroidViewModel(application) {
     var dbSize by mutableStateOf(0L)
     val dbTableStats = mutableStateListOf<TableStat>()
     var rawQueryResult by mutableStateOf<List<Map<String, Any?>>?>(null)
-    var rawQueryText by mutableStateOf("SELECT * FROM products LIMIT 5")
+    var rawQueryText by mutableStateOf("SELECT * FROM projects LIMIT 5")
     var rawQueryError by mutableStateOf<String?>(null)
+
+    // --- Persistent Developer Profile States ---
+    private val prefs = application.getSharedPreferences("developer_profile", android.content.Context.MODE_PRIVATE)
+
+    var devName by mutableStateOf("")
+    var devEmail by mutableStateOf("")
+    var devPhone by mutableStateOf("")
+    var devAddress by mutableStateOf("")
+
+    init {
+        var savedName = prefs.getString("dev_name", "Muhammad Tasawar") ?: "Muhammad Tasawar"
+        var savedEmail = prefs.getString("dev_email", "itxtasawar786@gmail.com") ?: "itxtasawar786@gmail.com"
+        var savedPhone = prefs.getString("dev_phone", "03116321786") ?: "03116321786"
+        var savedAddress = prefs.getString("dev_address", "Sargodha, Punjab, Pakistan") ?: "Sargodha, Punjab, Pakistan"
+
+        if (savedName == "Tasawar Abbas") {
+            savedName = "Muhammad Tasawar"
+            prefs.edit().putString("dev_name", "Muhammad Tasawar").apply()
+        }
+        if (savedPhone == "+92 300 1234567") {
+            savedPhone = "03116321786"
+            prefs.edit().putString("dev_phone", "03116321786").apply()
+        }
+
+        devName = savedName
+        devEmail = savedEmail
+        devPhone = savedPhone
+        devAddress = savedAddress
+    }
+
+    fun saveDeveloperProfile(name: String, email: String, phone: String, address: String) {
+        devName = name
+        devEmail = email
+        devPhone = phone
+        devAddress = address
+        prefs.edit()
+            .putString("dev_name", name)
+            .putString("dev_email", email)
+            .putString("dev_phone", phone)
+            .putString("dev_address", address)
+            .apply()
+    }
 
     fun refreshDbDiagnostics() {
         viewModelScope.launch {
@@ -52,161 +115,213 @@ class POSViewModel(application: Application) : AndroidViewModel(application) {
                 rawQueryResult = listOf(mapOf("INFO" to "Please enter a non-empty SQL query"))
                 return@launch
             }
-            // Check if it's a mutation query
-            val isMutation = rawQueryText.trim().uppercase().startsWith("INSERT") ||
-                    rawQueryText.trim().uppercase().startsWith("UPDATE") ||
-                    rawQueryText.trim().uppercase().startsWith("DELETE")
-            
             val result = sqlDatabaseController.executeRawQuery(rawQueryText)
             rawQueryResult = result
-            
-            if (isMutation) {
-                refreshDbDiagnostics()
-                refreshAlerts()
-            }
+            refreshDbDiagnostics()
         }
     }
 
     // --- State Observables (Flows connected to Database) ---
-    val products: StateFlow<List<Product>> = repository.allProducts
+    val projects: StateFlow<List<Project>> = repository.allProjects
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    val customers: StateFlow<List<Customer>> = repository.allCustomers
+    val services: StateFlow<List<Service>> = repository.allServices
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    val suppliers: StateFlow<List<Supplier>> = repository.allSuppliers
+    val skills: StateFlow<List<Skill>> = repository.allSkills
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    val sales: StateFlow<List<Sale>> = repository.allSales
+    val experiences: StateFlow<List<Experience>> = repository.allExperiences
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    val purchases: StateFlow<List<Purchase>> = repository.allPurchases
+    val educations: StateFlow<List<Education>> = repository.allEducations
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    val expenses: StateFlow<List<Expense>> = repository.allExpenses
+    val testimonials: StateFlow<List<Testimonial>> = repository.allTestimonials
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    // --- Navigation & Flow State ---
-    var currentScreen by mutableStateOf(Screen.LOGIN)
+    val blogs: StateFlow<List<BlogPost>> = repository.allBlogs
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val inquiries: StateFlow<List<Inquiry>> = repository.allInquiries
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    // --- Navigation ---
+    var currentScreen by mutableStateOf(Screen.MAIN) // Default to MAIN so visitors see the portfolio first
     var currentTab by mutableStateOf(MainTab.DASHBOARD)
 
-    // --- Auth Input State ---
+    // --- Theme Settings & Appearance ---
+    var isDarkMode by mutableStateOf(false)
+    var activeColorScheme by mutableStateOf(AppColorScheme.CLASSIC_BLUE)
+    var isStickyNavEnabled by mutableStateOf(true)
+    var showCookieConsent by mutableStateOf(true)
+
+    // --- Typing Header Text Animation State ---
+    var typedText by mutableStateOf("")
+    private val typingTitles = listOf(
+        "Full-Stack Software Engineer",
+        "WordPress Customizer & Architect",
+        "Web Optimization Specialist",
+        "Jetpack Compose Kotlin Developer"
+    )
+
+    // --- Active Logged Admin (For Editing Content) ---
+    var loggedInUser by mutableStateOf<User?>(null)
     var usernameInput by mutableStateOf("")
     var passwordInput by mutableStateOf("")
     var rememberMe by mutableStateOf(true)
     var authError by mutableStateOf<String?>(null)
 
-    // --- User Registration State ---
-    var regUsername by mutableStateOf("")
-    var regPassword by mutableStateOf("")
-    var regDisplayName by mutableStateOf("")
-    var regRole by mutableStateOf("Cashier") // Admin, Manager, Cashier, Employee
+    // --- Contact Form Input States ---
+    var contactName by mutableStateOf("")
+    var contactEmail by mutableStateOf("")
+    var contactPhone by mutableStateOf("")
+    var contactMessage by mutableStateOf("")
+    var contactSubmitSuccess by mutableStateOf(false)
+    var contactSubmitMessage by mutableStateOf("")
 
-    // --- Active Logged User ---
-    var loggedInUser by mutableStateOf<User?>(null)
+    // --- Project Filtering State ---
+    var activeProjectFilter by mutableStateOf("All") // All, WordPress, Web, Mobile
 
-    // --- POS Billing Cart State ---
-    val cart = mutableStateListOf<Pair<Product, Int>>() // Pair of Product to Quantity
-    var posDiscount by mutableStateOf(0.0) // Discount amount in PKR
-    var posTaxRate by mutableStateOf(2.0) // Tax percentage (e.g. 2% FBR standard)
-    var selectedCustomer by mutableStateOf<Customer?>(null)
-    var posPaymentMethod by mutableStateOf("Cash") // Cash, Card, JazzCash, EasyPaisa, Bank Transfer, On Credit
-    var isCheckingOut by mutableStateOf(false)
-    var lastCheckoutReceipt by mutableStateOf<Pair<Sale, List<SaleItem>>?>(null)
+    // --- Blog Search State ---
+    var blogSearchQuery by mutableStateOf("")
+    var activeBlogCategory by mutableStateOf("All")
 
-    // On Hold Sales: Key is hold timestamp/label, value is list of cart items
-    val holdSales = mutableStateMapOf<String, List<Pair<Product, Int>>>()
+    // --- Live Chat Integration States ---
+    var showLiveChatWindow by mutableStateOf(false)
+    val chatMessages = mutableStateListOf<ChatMessage>()
+    var chatInputText by mutableStateOf("")
+    var isAiTyping by mutableStateOf(false)
 
-    // --- Product Search & Filters ---
-    var productSearchQuery by mutableStateOf("")
-    var productFilterCategory by mutableStateOf("All")
-    var productLowStockFilter by mutableStateOf(false)
+    // --- Newsletter State ---
+    var newsletterEmail by mutableStateOf("")
+    var isNewsletterSubscribed by mutableStateOf(false)
 
-    // --- Customer Search ---
-    var customerSearchQuery by mutableStateOf("")
-
-    // --- Supplier Search ---
-    var supplierSearchQuery by mutableStateOf("")
-
-    // --- Settings State (Saved dynamically or reset) ---
-    var shopName by mutableStateOf("Zam Zam Whole Sale & Shopping Centre")
-    var shopAddress by mutableStateOf("Main Bazaar Ghalanai, Mohmand")
-    var shopPhone by mutableStateOf("0300-9876543")
-    var shopCurrency by mutableStateOf("PKR")
-    var appLanguage by mutableStateOf("English") // "English" or "Urdu"
-    var isDarkMode by mutableStateOf(false)
-    var receiptDesign by mutableStateOf("Thermal 80mm") // Thermal 80mm, A4 Standard
-
-    // --- Sync State ---
-    var syncing by mutableStateOf(false)
-    var lastSyncSummary by mutableStateOf<SyncSummary?>(null)
-
-    // --- Network & Connection Sync State ---
-    var isOnline by mutableStateOf(true)
-    var isManualOffline by mutableStateOf(false)
-
-    val isSystemOnline: Boolean
-        get() = isOnline && !isManualOffline
-
-    private val connectivityManager = application.getSystemService(android.content.Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
-
-    // --- Notifications Alert Feed ---
+    // --- Notification alert logs ---
     val notifications = mutableStateListOf<String>()
 
     init {
-        // Initial connection check
-        isOnline = checkInitialNetworkState()
-        registerNetworkCallback()
-
+        // Trigger default seed data if database is fresh
         viewModelScope.launch {
-            // Load sample data on startup
             repository.populateSampleDataIfEmpty()
+            addNotification("Developer Portfolio seeded with $devName's premium resume data.")
+            refreshDbDiagnostics()
+            startTypingAnimation()
             
-            // Check if user is already logged in (Firebase state or fallback to local rememberMe session)
+            // Seed initial AI welcome messages
+            chatMessages.add(
+                ChatMessage(
+                    sender = "AI_Assistant",
+                    text = "Hello! I am $devName's Virtual Portfolio Assistant. 🚀 Feel free to ask me anything about my coding skills, services, recent projects, or estimated project pricing!"
+                )
+            )
+
+            // See if any admin session is already active
             val user = firebaseAuthService.getCurrentUser()
             if (user != null) {
                 loggedInUser = user
-                currentScreen = Screen.MAIN
-                addNotification("Welcome back, ${user.displayName}! (Secured Session)")
-            }
-            refreshAlerts()
-            refreshDbDiagnostics()
-        }
-    }
-
-    // --- Refresh System Notifications (Stock alerts, Expiries) ---
-    fun refreshAlerts() {
-        viewModelScope.launch {
-            val allProds = repository.dao.getAllProducts()
-            notifications.clear()
-            var lowStockCount = 0
-            var outOfStockCount = 0
-            
-            allProds.forEach { prod ->
-                if (prod.stockQuantity == 0) {
-                    outOfStockCount++
-                    notifications.add("🚨 OUT OF STOCK: ${prod.name} has 0 left!")
-                } else if (prod.stockQuantity <= prod.minStockAlert) {
-                    lowStockCount++
-                    notifications.add("⚠️ LOW STOCK: ${prod.name} has only ${prod.stockQuantity} left!")
-                }
-            }
-            if (lowStockCount > 0 || outOfStockCount > 0) {
-                notifications.add("📊 Alert summary: $outOfStockCount out of stock, $lowStockCount low stock products require reorder.")
+                addNotification("Admin session active: welcome back ${user.displayName}.")
             }
         }
     }
 
-    private fun addNotification(msg: String) {
+    fun addNotification(msg: String) {
         if (!notifications.contains(msg)) {
             notifications.add(0, msg)
         }
     }
 
-    // --- Authentication Actions ---
+    // --- Typing Animation Engine ---
+    private fun startTypingAnimation() {
+        viewModelScope.launch {
+            var titleIndex = 0
+            while (true) {
+                val fullText = typingTitles[titleIndex]
+                // Type character by character
+                for (i in 0..fullText.length) {
+                    typedText = fullText.substring(0, i)
+                    delay(100)
+                }
+                delay(2000) // Hold at end of title
+                // Erase character by character
+                for (i in fullText.length downTo 0) {
+                    typedText = fullText.substring(0, i)
+                    delay(50)
+                }
+                delay(500) // Pause before next title
+                titleIndex = (titleIndex + 1) % typingTitles.size
+            }
+        }
+    }
+
+    // --- Submit Contact Inquiry ---
+    fun submitContactInquiry() {
+        if (contactName.isBlank() || contactEmail.isBlank() || contactMessage.isBlank()) {
+            contactSubmitSuccess = false
+            contactSubmitMessage = "Please complete all required fields (Name, Email, and Message)."
+            return
+        }
+        viewModelScope.launch {
+            val inquiry = Inquiry(
+                name = contactName,
+                email = contactEmail,
+                phone = contactPhone,
+                message = contactMessage,
+                timestamp = System.currentTimeMillis()
+            )
+            repository.saveInquiry(inquiry)
+            contactSubmitSuccess = true
+            contactSubmitMessage = "Thank you, ${contactName}! Your inquiry has been submitted securely. I'll get back to you shortly."
+            addNotification("📬 New Contact Inquiry submitted by ${contactName}.")
+            
+            // Clear inputs
+            contactName = ""
+            contactEmail = ""
+            contactPhone = ""
+            contactMessage = ""
+            
+            delay(5000) // Clear response state after 5 seconds
+            contactSubmitSuccess = false
+            contactSubmitMessage = ""
+            refreshDbDiagnostics()
+        }
+    }
+
+    fun addInquiry(name: String, emailOrPhone: String, projectType: String, message: String) {
+        viewModelScope.launch {
+            val inquiry = Inquiry(
+                name = name,
+                email = emailOrPhone,
+                phone = projectType, // Store category in phone field
+                message = message,
+                timestamp = System.currentTimeMillis()
+            )
+            repository.saveInquiry(inquiry)
+            addNotification("New project inquiry from $name.")
+            refreshDbDiagnostics()
+        }
+    }
+
+    // --- Newsletter Subscription ---
+    fun subscribeNewsletter() {
+        if (newsletterEmail.isBlank() || !newsletterEmail.contains("@")) {
+            addNotification("⚠️ Please enter a valid email address.")
+            return
+        }
+        isNewsletterSubscribed = true
+        addNotification("📬 Thank you! ${newsletterEmail} has been subscribed to my software newsletter.")
+        newsletterEmail = ""
+    }
+
+    // --- Admin Authentication ---
+    var regDisplayName by mutableStateOf("")
+    var regUsername by mutableStateOf("")
+    var regPassword by mutableStateOf("")
+    var regRole by mutableStateOf("Admin")
+
     fun performLogin() {
         if (usernameInput.isBlank() || passwordInput.isBlank()) {
-            authError = "Username and password cannot be empty."
+            authError = "Please enter both username and password."
             return
         }
         viewModelScope.launch {
@@ -218,10 +333,7 @@ class POSViewModel(application: Application) : AndroidViewModel(application) {
                     currentScreen = Screen.MAIN
                     usernameInput = ""
                     passwordInput = ""
-                    val source = if (result.isFirebase) "Firebase Cloud" else "Offline Database"
-                    addNotification("Secured login via $source: ${result.user.displayName} (${result.user.role}).")
-                    refreshAlerts()
-                    refreshDbDiagnostics()
+                    addNotification("Admin dashboard unlocked successfully.")
                 }
                 is AuthResult.Error -> {
                     authError = result.message
@@ -232,21 +344,20 @@ class POSViewModel(application: Application) : AndroidViewModel(application) {
 
     fun performSignup() {
         if (regUsername.isBlank() || regPassword.isBlank() || regDisplayName.isBlank()) {
-            authError = "All fields are required."
+            authError = "Please fill in all registration fields."
             return
         }
         viewModelScope.launch {
             val result = firebaseAuthService.signUp(regUsername, regPassword, regDisplayName, regRole)
             when (result) {
                 is AuthResult.Success -> {
+                    loggedInUser = result.user
                     authError = null
-                    usernameInput = regUsername
+                    currentScreen = Screen.MAIN
                     regUsername = ""
                     regPassword = ""
                     regDisplayName = ""
-                    currentScreen = Screen.LOGIN
-                    val source = if (result.isFirebase) "Firebase Cloud" else "Offline Database"
-                    addNotification("Account registered on $source successfully! Please login.")
+                    addNotification("Admin registered & logged in successfully.")
                 }
                 is AuthResult.Error -> {
                     authError = result.message
@@ -259,346 +370,223 @@ class POSViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             firebaseAuthService.signOut()
             loggedInUser = null
-            currentScreen = Screen.LOGIN
-            currentTab = MainTab.DASHBOARD
-            cart.clear()
-            selectedCustomer = null
-            addNotification("Logged out successfully.")
+            addNotification("Admin dashboard secured. Logged out successfully.")
         }
     }
 
-    // --- POS Billing Cart Actions ---
-    fun addProductToCart(product: Product) {
-        val existingIndex = cart.indexOfFirst { it.first.id == product.id }
-        if (existingIndex >= 0) {
-            val currentQty = cart[existingIndex].second
-            if (currentQty < product.stockQuantity) {
-                cart[existingIndex] = Pair(product, currentQty + 1)
-            } else {
-                addNotification("Cannot exceed available stock of ${product.stockQuantity} for ${product.name}")
-            }
-        } else {
-            if (product.stockQuantity > 0) {
-                cart.add(Pair(product, 1))
-            } else {
-                addNotification("${product.name} is out of stock.")
-            }
-        }
-    }
-
-    fun decreaseQuantityInCart(product: Product) {
-        val index = cart.indexOfFirst { it.first.id == product.id }
-        if (index >= 0) {
-            val currentQty = cart[index].second
-            if (currentQty > 1) {
-                cart[index] = Pair(product, currentQty - 1)
-            } else {
-                cart.removeAt(index)
-            }
-        }
-    }
-
-    fun removeProductFromCart(product: Product) {
-        cart.removeAll { it.first.id == product.id }
-    }
-
-    fun getCartSubtotal(): Double {
-        return cart.sumOf { it.first.retailPrice * it.second }
-    }
-
-    fun getCartTax(): Double {
-        return (getCartSubtotal() - posDiscount) * (posTaxRate / 100.0)
-    }
-
-    fun getCartTotal(): Double {
-        return (getCartSubtotal() - posDiscount + getCartTax()).coerceAtLeast(0.0)
-    }
-
-    fun clearCart() {
-        cart.clear()
-        posDiscount = 0.0
-        selectedCustomer = null
-    }
-
-    // Hold Sale
-    fun holdCurrentSale() {
-        if (cart.isEmpty()) return
-        val timestamp = SimpleDateFormat("HH:mm:ss (dd-MMM)", Locale.getDefault()).format(Date())
-        val holdLabel = "Hold # ${holdSales.size + 1} - $timestamp"
-        holdSales[holdLabel] = cart.toList()
-        cart.clear()
-        addNotification("Sale held successfully: $holdLabel")
-    }
-
-    // Resume Sale
-    fun resumeHeldSale(label: String) {
-        val items = holdSales[label] ?: return
-        cart.clear()
-        cart.addAll(items)
-        holdSales.remove(label)
-        addNotification("Resumed sale: $label")
-    }
-
-    // POS Checkout
-    fun checkout() {
-        if (cart.isEmpty()) return
-        isCheckingOut = true
+    // --- Live Chat Chatbot logic ---
+    fun sendChatMessage() {
+        val query = chatInputText.trim()
+        if (query.isBlank()) return
+        
+        chatMessages.add(ChatMessage(sender = "Visitor", text = query))
+        chatInputText = ""
+        isAiTyping = true
+        
         viewModelScope.launch {
-            val saleId = UUID.randomUUID().toString()
-            val sub = getCartSubtotal()
-            val disc = posDiscount
-            val tax = getCartTax()
-            val tot = getCartTotal()
-            
-            val sale = Sale(
-                id = saleId,
-                customerId = selectedCustomer?.id ?: "GUEST",
-                customerName = selectedCustomer?.name ?: "Guest Customer",
-                subtotal = sub,
-                discount = disc,
-                tax = tax,
-                totalAmount = tot,
-                paymentMethod = posPaymentMethod,
-                cashierName = loggedInUser?.displayName ?: "Cashier",
-                status = "Completed",
-                isSynced = false
+            delay(1200) // Simulated AI thinking latency
+            val reply = generateAssistantReply(query)
+            chatMessages.add(ChatMessage(sender = "AI_Assistant", text = reply))
+            isAiTyping = false
+        }
+    }
+
+    private fun generateAssistantReply(query: String): String {
+        val q = query.lowercase()
+        return when {
+            q.contains("hello") || q.contains("hi") || q.contains("hey") -> {
+                "Hello there! How can $devName help you with your software development requirements today? Ask me about his services, tech skills, or portfolios!"
+            }
+            q.contains("skill") || q.contains("technolog") || q.contains("program") || q.contains("language") -> {
+                "$devName is fluent in WordPress theme development, Custom PHP APIs, MySQL database indexing, Modern HTML/CSS grids, JavaScript interactivity, and Kotlin Jetpack Compose for mobile!"
+            }
+            q.contains("service") || q.contains("offer") || q.contains("what can you do") -> {
+                "We offer fully responsive WordPress Websites, E-Commerce stores (WooCommerce), conversion Landing Pages, Core Web Vitals optimization, Database vacuum audits, and priority WordPress Bug Fixing."
+            }
+            q.contains("project") || q.contains("portfolio") || q.contains("recent work") -> {
+                "Some of my recent projects include: EcoShop Storefront (a green-tech WooCommerce portal), MedHub (a custom PHP clinic scheduling directory), and Modern Agency (a 100/100 optimized Gutenberg lander)."
+            }
+            q.contains("price") || q.contains("cost") || q.contains("rate") || q.contains("budget") -> {
+                "$devName's WordPress development starts around $500, Landing Pages from $250, Speed Optimization tasks for $150, and complex custom PHP dashboards typically start from $1200. Contact us directly to get a custom quote!"
+            }
+            q.contains("contact") || q.contains("hire") || q.contains("email") || q.contains("phone") -> {
+                "You can hire $devName directly by submitting the form under the Contact Tab, emailing him at $devEmail, or messaging him on WhatsApp at $devPhone!"
+            }
+            q.contains("experience") || q.contains("work") || q.contains("history") -> {
+                "$devName has 8+ years of total tech experience, working as a Senior Web Specialist, a corporate Software Architect, and a computer science programming mentor."
+            }
+            else -> {
+                "I understand! $devName is highly specialized in solving custom WordPress and software requirements. Would you like me to record your message, or would you like to submit a formal inquiry under the 'Contact' tab so he can email you back?"
+            }
+        }
+    }
+
+    // --- Content Management Admin Actions ---
+    fun addProject(title: String, desc: String, tech: String, img: String, demo: String, git: String, category: String) {
+        viewModelScope.launch {
+            val project = Project(
+                title = title,
+                description = desc,
+                technologies = tech,
+                imageUrl = img.ifBlank { "https://images.unsplash.com/photo-1531403009284-440f080d1e12?auto=format&fit=crop&q=80&w=400" },
+                demoUrl = demo.ifBlank { "https://example.com" },
+                githubUrl = git.ifBlank { "https://github.com" },
+                category = category
             )
-
-            val saleItems = cart.map { (prod, qty) ->
-                SaleItem(
-                    saleId = saleId,
-                    productId = prod.id,
-                    productName = prod.name,
-                    quantity = qty,
-                    purchasePrice = prod.purchasePrice,
-                    salePrice = prod.retailPrice,
-                    totalLinePrice = prod.retailPrice * qty
-                )
-            }
-
-            repository.checkoutSale(sale, saleItems)
-            lastCheckoutReceipt = Pair(sale, saleItems)
-            
-            // Notification
-            addNotification("🛒 POS Invoice Generated: ${sale.customerName} - Total PKR ${sale.totalAmount}")
-            
-            // Reset states
-            clearCart()
-            refreshAlerts()
-            isCheckingOut = false
+            repository.saveProject(project)
+            addNotification("Project '${title}' added successfully.")
+            refreshDbDiagnostics()
         }
     }
 
-    // Invoice Return
-    fun performInvoiceReturn(saleId: String) {
+    fun deleteProject(project: Project) {
         viewModelScope.launch {
-            repository.returnSaleInvoice(saleId)
-            addNotification("🔄 Invoice Return Processed: Sale ID $saleId stock restored")
-            refreshAlerts()
+            repository.deleteProject(project)
+            addNotification("Project '${project.title}' deleted.")
+            refreshDbDiagnostics()
         }
     }
 
-    // --- Product Management CRUD ---
-    fun addProduct(
-        name: String,
-        sku: String,
-        barcode: String,
-        category: String,
-        brand: String,
-        unit: String,
-        purchasePrice: Double,
-        retailPrice: Double,
-        wholesalePrice: Double,
-        stockQuantity: Int,
-        minStockAlert: Int,
-        expiryDate: String
-    ) {
+    fun addService(title: String, desc: String, icon: String) {
         viewModelScope.launch {
-            val p = Product(
-                name = name,
-                sku = sku.ifBlank { "SKU-" + (1000..9999).random() },
-                barcode = barcode.ifBlank { (100000000000..999999999999).random().toString() },
+            val service = Service(title = title, description = desc, iconName = icon)
+            repository.saveService(service)
+            addNotification("Service '${title}' registered.")
+            refreshDbDiagnostics()
+        }
+    }
+
+    fun deleteService(service: Service) {
+        viewModelScope.launch {
+            repository.deleteService(service)
+            addNotification("Service '${service.title}' removed.")
+            refreshDbDiagnostics()
+        }
+    }
+
+    fun addSkill(name: String, progress: Int, category: String) {
+        viewModelScope.launch {
+            val skill = Skill(name = name, progress = progress.coerceIn(0, 100), category = category)
+            repository.saveSkill(skill)
+            addNotification("Skill '${name}' updated to ${progress}%.")
+            refreshDbDiagnostics()
+        }
+    }
+
+    fun deleteSkill(skill: Skill) {
+        viewModelScope.launch {
+            repository.deleteSkill(skill)
+            addNotification("Skill '${skill.name}' removed.")
+            refreshDbDiagnostics()
+        }
+    }
+
+    fun addBlog(title: String, content: String, category: String) {
+        viewModelScope.launch {
+            val blog = BlogPost(
+                title = title,
+                content = content,
                 category = category,
-                brand = brand,
-                unit = unit,
-                purchasePrice = purchasePrice,
-                retailPrice = retailPrice,
-                wholesalePrice = wholesalePrice,
-                stockQuantity = stockQuantity,
-                minStockAlert = minStockAlert,
-                expiryDate = expiryDate.ifBlank { "2027-12-31" }
+                date = SimpleDateFormat("MMMM dd, yyyy", Locale.getDefault()).format(Date())
             )
-            repository.saveProduct(p)
-            addNotification("📦 Product Added: $name")
-            refreshAlerts()
+            repository.saveBlog(blog)
+            addNotification("Blog '${title}' published.")
+            refreshDbDiagnostics()
         }
     }
 
-    fun deleteProduct(product: Product) {
+    fun deleteBlog(blog: BlogPost) {
         viewModelScope.launch {
-            repository.deleteProduct(product)
-            addNotification("❌ Product Deleted: ${product.name}")
-            refreshAlerts()
+            repository.deleteBlog(blog)
+            addNotification("Blog '${blog.title}' deleted.")
+            refreshDbDiagnostics()
         }
     }
 
-    fun editProduct(product: Product) {
+    fun deleteInquiry(inquiry: Inquiry) {
         viewModelScope.launch {
-            repository.updateProduct(product)
-            addNotification("📦 Product Updated: ${product.name}")
-            refreshAlerts()
+            repository.deleteInquiry(inquiry)
+            addNotification("Inquiry from ${inquiry.name} deleted.")
+            refreshDbDiagnostics()
         }
     }
 
-    // --- Customer Operations ---
-    fun addCustomer(name: String, phone: String, email: String, address: String) {
+    fun addExperience(role: String, company: String, period: String, description: String) {
         viewModelScope.launch {
-            val c = Customer(name = name, phone = phone, email = email, address = address, balance = 0.0)
-            repository.saveCustomer(c)
-            addNotification("👤 Customer Registered: $name")
-        }
-    }
-
-    fun updateCustomerBalance(customerId: String, adjustAmount: Double, isCredit: Boolean) {
-        viewModelScope.launch {
-            val customer = repository.dao.getCustomerById(customerId) ?: return@launch
-            val adjustment = if (isCredit) adjustAmount else -adjustAmount
-            val updated = customer.copy(
-                balance = customer.balance + adjustment,
-                lastUpdated = System.currentTimeMillis()
+            val exp = Experience(
+                role = role,
+                company = company,
+                period = period,
+                description = description,
+                type = "Professional"
             )
-            repository.updateCustomer(updated)
-            addNotification("💳 Customer Balance Adjusted: ${customer.name} PKR $adjustAmount")
+            repository.saveExperience(exp)
+            addNotification("Experience '${role}' added.")
+            refreshDbDiagnostics()
         }
     }
 
-    fun deleteCustomer(customer: Customer) {
+    fun deleteExperience(experience: Experience) {
         viewModelScope.launch {
-            repository.deleteCustomer(customer)
-            addNotification("❌ Customer Record Deleted: ${customer.name}")
+            repository.deleteExperience(experience)
+            addNotification("Experience '${experience.role}' deleted.")
+            refreshDbDiagnostics()
         }
     }
 
-    // --- Supplier Operations ---
-    fun addSupplier(name: String, phone: String, email: String, address: String) {
+    fun addEducation(degree: String, institution: String, period: String, description: String) {
         viewModelScope.launch {
-            val s = Supplier(name = name, phone = phone, email = email, address = address, balance = 0.0)
-            repository.saveSupplier(s)
-            addNotification("🏭 Supplier Registered: $name")
-        }
-    }
-
-    fun updateSupplierBalance(supplierId: String, amount: Double) {
-        viewModelScope.launch {
-            val s = repository.dao.getAllSuppliers().find { it.id == supplierId } ?: return@launch
-            val updated = s.copy(balance = s.balance + amount, lastUpdated = System.currentTimeMillis())
-            repository.updateSupplier(updated)
-            addNotification("💳 Supplier Balance Updated: ${s.name} balance is now PKR ${updated.balance}")
-        }
-    }
-
-    fun deleteSupplier(supplier: Supplier) {
-        viewModelScope.launch {
-            repository.deleteSupplier(supplier)
-            addNotification("❌ Supplier Record Deleted: ${supplier.name}")
-        }
-    }
-
-    // --- Expense Operations ---
-    fun addExpense(category: String, amount: Double, desc: String) {
-        if (amount <= 0.0) return
-        viewModelScope.launch {
-            val e = Expense(category = category, amount = amount, description = desc)
-            repository.saveExpense(e)
-            addNotification("💸 Expense Logged: $category - PKR $amount")
-        }
-    }
-
-    fun deleteExpense(expense: Expense) {
-        viewModelScope.launch {
-            repository.deleteExpense(expense)
-            addNotification("💸 Expense Deleted: ${expense.category}")
-        }
-    }
-
-    // --- Bulk Stock Purchase (Supplier Purchase Flow) ---
-    fun logBulkPurchase(supplierId: String, supplierName: String, productId: String, productName: String, quantity: Int, costPrice: Double) {
-        viewModelScope.launch {
-            val purchaseId = UUID.randomUUID().toString()
-            val total = quantity * costPrice
-            val p = Purchase(
-                id = purchaseId,
-                supplierId = supplierId,
-                supplierName = supplierName,
-                totalAmount = total
+            val edu = Education(
+                degree = degree,
+                institution = institution,
+                period = period,
+                description = description
             )
-            val pItem = PurchaseItem(
-                purchaseId = purchaseId,
-                productId = productId,
-                productName = productName,
-                quantity = quantity,
-                purchasePrice = costPrice,
-                totalLinePrice = total
-            )
-            repository.checkoutPurchase(p, listOf(pItem))
-            addNotification("📦 Supplier Purchase Logged: $productName ($quantity pack) added from $supplierName")
-            refreshAlerts()
+            repository.saveEducation(edu)
+            addNotification("Education milestone '${degree}' added.")
+            refreshDbDiagnostics()
         }
     }
 
-    // --- Simulated Firebase Cloud Synced Indicator ---
-    fun syncWithCloud() {
-        if (syncing) return
-        if (!isSystemOnline) {
-            addNotification("⚠️ Cannot sync: System is currently OFFLINE.")
-            return
-        }
-        syncing = true
-        addNotification("🔄 Syncing SQLite data with Firebase Cloud Firestore...")
+    fun deleteEducation(education: Education) {
         viewModelScope.launch {
-            val summary = repository.performCloudSync()
-            lastSyncSummary = summary
-            syncing = false
-            addNotification("✅ Sync Complete: ${summary.totalSynced} records safely synced to Firestore cloud!")
+            repository.deleteEducation(education)
+            addNotification("Education milestone '${education.degree}' deleted.")
+            refreshDbDiagnostics()
         }
     }
 
-    private fun checkInitialNetworkState(): Boolean {
-        if (connectivityManager == null) return false
-        val network = connectivityManager.activeNetwork ?: return false
-        val capabilities = connectivityManager.getNetworkCapabilities(network) ?: return false
-        return capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
-    }
-
-    private fun registerNetworkCallback() {
-        if (connectivityManager == null) return
-        val builder = NetworkRequest.Builder()
-            .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
-        try {
-            connectivityManager.registerNetworkCallback(
-                builder.build(),
-                object : ConnectivityManager.NetworkCallback() {
-                    override fun onAvailable(network: Network) {
-                        isOnline = true
-                    }
-                    override fun onLost(network: Network) {
-                        isOnline = false
-                    }
-                }
-            )
-        } catch (e: Exception) {
-            e.printStackTrace()
+    // --- Admin Database Maintenance Commands ---
+    fun runVacuumOptimization() {
+        viewModelScope.launch {
+            val success = sqlDatabaseController.runVacuum()
+            if (success) {
+                addNotification("🧹 SQLite VACUUM optimization executed! Database file defragmented.")
+            } else {
+                addNotification("❌ SQLite VACUUM execution failed.")
+            }
+            refreshDbDiagnostics()
         }
     }
 
-    // --- Settings Preferences Action ---
-    fun saveShopSettings(name: String, addr: String, ph: String, curr: String, lang: String, receipt: String) {
-        shopName = name
-        shopAddress = addr
-        shopPhone = ph
-        shopCurrency = curr
-        appLanguage = lang
-        receiptDesign = receipt
-        addNotification("⚙️ Shop configuration saved successfully.")
+    fun triggerOneClickDemoImport() {
+        viewModelScope.launch {
+            repository.clearAllData()
+            repository.populateSampleDataIfEmpty()
+            addNotification("🔄 Portfolio refreshed: Sample WordPress Demo imported successfully!")
+            refreshDbDiagnostics()
+        }
+    }
+
+    fun triggerBackup() {
+        viewModelScope.launch {
+            val file = sqlDatabaseController.backupDatabase()
+            if (file != null) {
+                addNotification("💾 Automatic Backup Successful! SQLite database backed up safely to internal storage.")
+            } else {
+                addNotification("❌ Database Backup Failed.")
+            }
+            refreshDbDiagnostics()
+        }
     }
 }

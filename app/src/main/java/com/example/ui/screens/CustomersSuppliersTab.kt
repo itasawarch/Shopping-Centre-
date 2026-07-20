@@ -1,14 +1,11 @@
 package com.example.ui.screens
 
 import androidx.compose.animation.*
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -19,84 +16,77 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
-import com.example.data.Customer
-import com.example.data.Supplier
+import com.example.data.Skill
 import com.example.ui.POSViewModel
+import com.example.ui.components.getSchemeColors
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CustomersSuppliersTab(viewModel: POSViewModel) {
-    val customersList by viewModel.customers.collectAsState()
-    val suppliersList by viewModel.suppliers.collectAsState()
+    val colors = getSchemeColors(viewModel.activeColorScheme, viewModel.isDarkMode)
+    val skillsList by viewModel.skills.collectAsState()
+    val isAdmin = viewModel.loggedInUser != null
 
-    var activeSubTab by remember { mutableStateOf("Customers") } // "Customers" or "Suppliers"
-    
-    var showAddCustDialog by remember { mutableStateOf(false) }
-    var showAddSuppDialog by remember { mutableStateOf(false) }
-    var showLedgerAdjustDialog by remember { mutableStateOf<Customer?>(null) }
+    var activeCategoryFilter by remember { mutableStateOf("All") } // "All", "CMS / WordPress", "Core Frontend", "Backend & DB", "Design & Tools"
+    var searchQuery by remember { mutableStateOf("") }
+    var showAddDialog by remember { mutableStateOf(false) }
+    var skillToEdit by remember { mutableStateOf<Skill?>(null) }
 
-    val filteredCustomers = customersList.filter {
-        it.name.contains(viewModel.customerSearchQuery, ignoreCase = true) ||
-        it.phone.contains(viewModel.customerSearchQuery, ignoreCase = true)
-    }
+    // Standard core categories in alignment with seeded data
+    val categories = listOf("All", "CMS / WordPress", "Core Frontend", "Backend & DB", "Design & Tools")
 
-    val filteredSuppliers = suppliersList.filter {
-        it.name.contains(viewModel.supplierSearchQuery, ignoreCase = true) ||
-        it.phone.contains(viewModel.supplierSearchQuery, ignoreCase = true)
+    val filteredSkills = skillsList.filter { skill ->
+        val matchesCategory = activeCategoryFilter == "All" ||
+                skill.category.equals(activeCategoryFilter, ignoreCase = true)
+        val matchesSearch = searchQuery.isBlank() ||
+                skill.name.contains(searchQuery, ignoreCase = true) ||
+                skill.category.contains(searchQuery, ignoreCase = true)
+        matchesCategory && matchesSearch
     }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .testTag("customers_suppliers_tab")
+            .background(colors.bgMain)
             .padding(16.dp)
+            .testTag("customers_suppliers_tab")
     ) {
-        // Switch Header Tabs
+        // ==========================================
+        // 1. HEADER TITLE ROW
+        // ==========================================
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(
-                modifier = Modifier
-                    .background(Color(0xFFE2E8F0), RoundedCornerShape(10.dp))
-                    .padding(4.dp)
-            ) {
-                listOf("Customers", "Suppliers").forEach { sub ->
-                    val isSel = activeSubTab == sub
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(if (isSel) Color(0xFF007A48) else Color.Transparent)
-                            .clickable { activeSubTab = sub }
-                            .padding(horizontal = 16.dp, vertical = 8.dp)
-                    ) {
-                        Text(
-                            text = sub,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = if (isSel) Color.White else Color.Black
-                        )
-                    }
-                }
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Technical Skill Matrix",
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Black,
+                    color = colors.textPrimary
+                )
+                Text(
+                    text = "Dynamic expertise rating across full-stack languages, CMS customizers, and modern libraries.",
+                    fontSize = 11.sp,
+                    color = colors.textSecondary
+                )
             }
 
-            // Quick registration button
-            Button(
-                onClick = {
-                    if (activeSubTab == "Customers") showAddCustDialog = true
-                    else showAddSuppDialog = true
-                },
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF007A48)),
-                shape = RoundedCornerShape(10.dp),
-                modifier = Modifier.testTag("add_partner_button")
-            ) {
-                Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(modifier = Modifier.width(4.dp))
-                Text("Register $activeSubTab", fontSize = 11.sp)
+            if (isAdmin) {
+                Button(
+                    onClick = { showAddDialog = true },
+                    colors = ButtonDefaults.buttonColors(containerColor = colors.primary),
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier.testTag("add_partner_button")
+                ) {
+                    Icon(imageVector = Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Add Skill", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                }
             }
         }
 
@@ -104,364 +94,404 @@ fun CustomersSuppliersTab(viewModel: POSViewModel) {
 
         // Search panel
         OutlinedTextField(
-            value = if (activeSubTab == "Customers") viewModel.customerSearchQuery else viewModel.supplierSearchQuery,
-            onValueChange = {
-                if (activeSubTab == "Customers") viewModel.customerSearchQuery = it
-                else viewModel.supplierSearchQuery = it
-            },
-            placeholder = { Text("Search by name, phone or shop address...", fontSize = 13.sp) },
-            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = Color(0xFF007A48)) },
+            value = searchQuery,
+            onValueChange = { searchQuery = it },
+            placeholder = { Text("Search skill names (e.g., WordPress, Kotlin, PHP)...", fontSize = 12.sp) },
+            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = colors.primary) },
             singleLine = true,
             colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = Color(0xFF007A48),
-                unfocusedBorderColor = Color(0xFFCBD5E1)
+                focusedBorderColor = colors.primary,
+                unfocusedBorderColor = colors.border
             ),
-            shape = RoundedCornerShape(10.dp),
-            modifier = Modifier.fillMaxWidth().testTag("partner_search_field")
+            shape = RoundedCornerShape(12.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("partner_search_field")
         )
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // Category Filter Row Pills
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState())
+                .padding(vertical = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            categories.forEach { cat ->
+                val isSel = activeCategoryFilter == cat
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(if (isSel) colors.primary else colors.surface)
+                        .border(1.dp, if (isSel) colors.primary else colors.border, RoundedCornerShape(20.dp))
+                        .clickable { activeCategoryFilter = cat }
+                        .padding(horizontal = 14.dp, vertical = 6.dp)
+                ) {
+                    Text(
+                        text = cat,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = if (isSel) Color.White else colors.textSecondary
+                    )
+                }
+            }
+        }
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Main List Content
-        if (activeSubTab == "Customers") {
-            if (filteredCustomers.isEmpty()) {
-                Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                    Text("No customer records found. Tap Register to add.", color = Color.Gray, fontSize = 13.sp)
-                }
-            } else {
-                LazyColumn(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    items(filteredCustomers) { cust ->
-                        CustomerCardRow(
-                            customer = cust,
-                            onAdjustLedger = { showLedgerAdjustDialog = cust },
-                            onDelete = { viewModel.deleteCustomer(cust) }
-                        )
-                    }
+        // ==========================================
+        // 2. SKILL PROGRESS BAR CARDS
+        // ==========================================
+        if (filteredSkills.isEmpty()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Icon(
+                        imageVector = Icons.Default.Psychology,
+                        contentDescription = null,
+                        modifier = Modifier.size(56.dp),
+                        tint = colors.textSecondary.copy(alpha = 0.5f)
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        text = "No skills match this filter criteria.",
+                        color = colors.textSecondary,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Medium
+                    )
                 }
             }
         } else {
-            if (filteredSuppliers.isEmpty()) {
-                Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                    Text("No supplier records found. Tap Register to add.", color = Color.Gray, fontSize = 13.sp)
-                }
-            } else {
-                LazyColumn(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    items(filteredSuppliers) { supp ->
-                        SupplierCardRow(
-                            supplier = supp,
-                            onPaySupplier = { viewModel.updateSupplierBalance(supp.id, -10000.0) }, // pay 10,000 pkr simulation
-                            onDelete = { viewModel.deleteSupplier(supp) }
-                        )
+            LazyColumn(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                items(filteredSkills) { skill ->
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .border(1.dp, colors.border, RoundedCornerShape(16.dp)),
+                        colors = CardDefaults.cardColors(containerColor = colors.surface),
+                        shape = RoundedCornerShape(16.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column {
+                                    Text(
+                                        text = skill.name,
+                                        fontWeight = FontWeight.Black,
+                                        fontSize = 15.sp,
+                                        color = colors.textPrimary
+                                    )
+                                    Text(
+                                        text = "Section: ${skill.category}",
+                                        fontSize = 11.sp,
+                                        color = colors.textSecondary
+                                    )
+                                }
+
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Box(
+                                        modifier = Modifier
+                                            .background(colors.primary.copy(alpha = 0.15f), RoundedCornerShape(4.dp))
+                                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                                    ) {
+                                        Text(
+                                            text = "${(skill.progress / 10).coerceAtLeast(1)}Y EXP",
+                                            fontSize = 9.sp,
+                                            fontWeight = FontWeight.Black,
+                                            color = colors.primary
+                                        )
+                                    }
+
+                                    if (isAdmin) {
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        IconButton(
+                                            onClick = { skillToEdit = skill },
+                                            modifier = Modifier.size(28.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.Edit,
+                                                contentDescription = "Edit Skill",
+                                                tint = colors.primary,
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                        }
+                                        IconButton(
+                                            onClick = { viewModel.deleteSkill(skill) },
+                                            modifier = Modifier.size(28.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.Delete,
+                                                contentDescription = "Delete Skill",
+                                                tint = Color.Red,
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(10.dp))
+
+                            // Beautiful Progress Tracker Row
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                LinearProgressIndicator(
+                                    progress = skill.progress / 100f,
+                                    color = colors.primary,
+                                    trackColor = colors.border,
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .height(8.dp)
+                                        .clip(RoundedCornerShape(4.dp))
+                                )
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Text(
+                                    text = "${skill.progress}%",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Black,
+                                    color = colors.primary
+                                )
+                            }
+                        }
                     }
                 }
             }
         }
     }
 
-    // Register Customer Dialog
-    if (showAddCustDialog) {
-        PartnerDialog(
-            title = "Register New Customer",
-            labelName = "Customer Name *",
-            onDismiss = { showAddCustDialog = false },
-            onSave = { name, phone, email, address ->
-                viewModel.addCustomer(name, phone, email, address)
-                showAddCustDialog = false
-            }
-        )
-    }
+    // ==========================================
+    // 3. REGISTER SKILL DIALOG (ADMIN)
+    // ==========================================
+    if (showAddDialog) {
+        var name by remember { mutableStateOf("") }
+        var category by remember { mutableStateOf("CMS / WordPress") }
+        var progressText by remember { mutableStateOf("90") }
 
-    // Register Supplier Dialog
-    if (showAddSuppDialog) {
-        PartnerDialog(
-            title = "Register New Supplier",
-            labelName = "Supplier Business Name *",
-            onDismiss = { showAddSuppDialog = false },
-            onSave = { name, phone, email, address ->
-                viewModel.addSupplier(name, phone, email, address)
-                showAddSuppDialog = false
-            }
-        )
-    }
-
-    // Ledger Adjustment Dialog
-    showLedgerAdjustDialog?.let { cust ->
-        var amountText by remember { mutableStateOf("") }
-        var isCredit by remember { mutableStateOf(true) } // Credit increases balance, Debit decreases it
-
-        Dialog(onDismissRequest = { showLedgerAdjustDialog = null }) {
+        Dialog(onDismissRequest = { showAddDialog = false }) {
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(16.dp),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.White)
+                    .padding(8.dp),
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = colors.surface),
+                border = BorderStroke(1.dp, colors.border)
             ) {
                 Column(
-                    modifier = Modifier.padding(20.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                    modifier = Modifier.padding(24.dp),
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
-                    Text("Adjust Customer Ledger", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color(0xFF007A48))
-                    Text("Customer: ${cust.name}", fontSize = 12.sp, color = Color.Gray)
-                    Text("Current Outstanding: ${cust.balance} PKR", fontSize = 13.sp, fontWeight = FontWeight.Bold)
-
-                    Divider(color = Color(0xFFEDF2F7))
-
-                    OutlinedTextField(
-                        value = amountText,
-                        onValueChange = { amountText = it },
-                        label = { Text("Adjustment Amount (PKR)") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth().testTag("ledger_adjust_input")
+                    Text(
+                        text = "Register Technical Skill",
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Black,
+                        color = colors.textPrimary
                     )
 
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        Button(
-                            onClick = { isCredit = true },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = if (isCredit) Color(0xFF10B981) else Color(0xFFE2E8F0)
-                            ),
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Text("CREDIT (Pay)", color = if (isCredit) Color.White else Color.Black, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                        }
+                    OutlinedTextField(
+                        value = name,
+                        onValueChange = { name = it },
+                        label = { Text("Skill Name *") },
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = colors.primary),
+                        modifier = Modifier.fillMaxWidth()
+                    )
 
-                        Button(
-                            onClick = { isCredit = false },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = if (!isCredit) Color(0xFFEF4444) else Color(0xFFE2E8F0)
-                            ),
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Text("DEBIT (Charge)", color = if (!isCredit) Color.White else Color.Black, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    // Category Selections
+                    Text("Select Skill Segment Category:", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = colors.textSecondary)
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        val segs = listOf("CMS / WordPress", "Core Frontend", "Backend & DB", "Design & Tools")
+                        segs.forEach { seg ->
+                            val isSel = category == seg
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(if (isSel) colors.primary.copy(alpha = 0.15f) else Color.Transparent)
+                                    .border(1.dp, if (isSel) colors.primary else Color.Transparent, RoundedCornerShape(8.dp))
+                                    .clickable { category = seg }
+                                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                RadioButton(
+                                    selected = isSel,
+                                    onClick = { category = seg },
+                                    colors = RadioButtonDefaults.colors(selectedColor = colors.primary)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = seg,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (isSel) colors.primary else colors.textSecondary
+                                )
+                            }
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = progressText,
+                        onValueChange = { progressText = it },
+                        label = { Text("Expertise Proficiency (0-100)%") },
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = colors.primary),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    Spacer(modifier = Modifier.height(10.dp))
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        OutlinedButton(onClick = { showLedgerAdjustDialog = null }, modifier = Modifier.weight(1f)) {
+                        OutlinedButton(
+                            onClick = { showAddDialog = false },
+                            modifier = Modifier.weight(1f)
+                        ) {
                             Text("Cancel")
                         }
                         Button(
                             onClick = {
-                                val amt = amountText.toDoubleOrNull() ?: 0.0
-                                if (amt > 0) {
-                                    viewModel.updateCustomerBalance(cust.id, amt, isCredit)
+                                if (name.isNotBlank()) {
+                                    val progressVal = progressText.toIntOrNull() ?: 90
+                                    viewModel.addSkill(name, progressVal, category)
+                                    showAddDialog = false
                                 }
-                                showLedgerAdjustDialog = null
                             },
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF007A48)),
-                            modifier = Modifier.weight(1.2f).testTag("save_ledger_btn")
+                            colors = ButtonDefaults.buttonColors(containerColor = colors.primary),
+                            modifier = Modifier.weight(1.2f)
                         ) {
-                            Text("Save Ledger")
+                            Text("Save Skill")
                         }
                     }
                 }
             }
         }
     }
-}
 
-@Composable
-fun CustomerCardRow(customer: Customer, onAdjustLedger: () -> Unit, onDelete: () -> Unit) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .border(1.dp, Color(0xFFE2E8F0), RoundedCornerShape(12.dp)),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        shape = RoundedCornerShape(12.dp)
-    ) {
-        Column(modifier = Modifier.padding(14.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+    // ==========================================
+    // 4. EDIT SKILL DIALOG (ADMIN)
+    // ==========================================
+    if (skillToEdit != null) {
+        val sk = skillToEdit!!
+        var name by remember { mutableStateOf(sk.name) }
+        var category by remember { mutableStateOf(sk.category) }
+        var progressText by remember { mutableStateOf(sk.progress.toString()) }
+
+        Dialog(onDismissRequest = { skillToEdit = null }) {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(8.dp),
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = colors.surface),
+                border = BorderStroke(1.dp, colors.border)
             ) {
-                Column {
-                    Text(customer.name, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                    Text("Phone: ${customer.phone} • Address: ${customer.address}", fontSize = 11.sp, color = Color.Gray)
-                }
-                
-                Column(horizontalAlignment = Alignment.End) {
-                    Text("Outstanding Balance", fontSize = 10.sp, color = Color.Gray)
+                Column(
+                    modifier = Modifier.padding(24.dp),
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
                     Text(
-                        text = "${customer.balance} PKR",
-                        fontSize = 14.sp,
+                        text = "Modify Technical Skill",
+                        fontSize = 18.sp,
                         fontWeight = FontWeight.Black,
-                        color = if (customer.balance < 0) Color(0xFFEF4444) else Color(0xFF10B981)
+                        color = colors.textPrimary
                     )
-                }
-            }
 
-            Divider(modifier = Modifier.padding(vertical = 10.dp), color = Color(0xFFEDF2F7))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // Adjust Balance Button
-                Button(
-                    onClick = onAdjustLedger,
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF007A48)),
-                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 2.dp),
-                    shape = RoundedCornerShape(8.dp),
-                    modifier = Modifier.height(28.dp)
-                ) {
-                    Text("Adjust Ledger Balance", fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                }
-
-                IconButton(onClick = onDelete, modifier = Modifier.size(28.dp)) {
-                    Icon(Icons.Default.Delete, contentDescription = null, tint = Color.Red, modifier = Modifier.size(18.dp))
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun SupplierCardRow(supplier: Supplier, onPaySupplier: () -> Unit, onDelete: () -> Unit) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .border(1.dp, Color(0xFFE2E8F0), RoundedCornerShape(12.dp)),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        shape = RoundedCornerShape(12.dp)
-    ) {
-        Column(modifier = Modifier.padding(14.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column {
-                    Text(supplier.name, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                    Text("Phone: ${supplier.phone} • Address: ${supplier.address}", fontSize = 11.sp, color = Color.Gray)
-                }
-                
-                Column(horizontalAlignment = Alignment.End) {
-                    Text("Payable Balance", fontSize = 10.sp, color = Color.Gray)
-                    Text(
-                        text = "${supplier.balance} PKR",
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Black,
-                        color = if (supplier.balance > 0) Color(0xFFFBBF24) else Color(0xFF10B981)
+                    OutlinedTextField(
+                        value = name,
+                        onValueChange = { name = it },
+                        label = { Text("Skill Name *") },
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = colors.primary),
+                        modifier = Modifier.fillMaxWidth()
                     )
-                }
-            }
 
-            Divider(modifier = Modifier.padding(vertical = 10.dp), color = Color(0xFFEDF2F7))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // Simulated Supplier Payment trigger
-                Button(
-                    onClick = onPaySupplier,
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF059669)),
-                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 2.dp),
-                    shape = RoundedCornerShape(8.dp),
-                    modifier = Modifier.height(28.dp)
-                ) {
-                    Text("Simulate Supplier Payment (10k PKR)", fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                }
-
-                IconButton(onClick = onDelete, modifier = Modifier.size(28.dp)) {
-                    Icon(Icons.Default.Delete, contentDescription = null, tint = Color.Red, modifier = Modifier.size(18.dp))
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun PartnerDialog(
-    title: String,
-    labelName: String,
-    onDismiss: () -> Unit,
-    onSave: (String, String, String, String) -> Unit
-) {
-    var name by remember { mutableStateOf("") }
-    var phone by remember { mutableStateOf("") }
-    var email by remember { mutableStateOf("") }
-    var address by remember { mutableStateOf("") }
-
-    Dialog(onDismissRequest = onDismiss) {
-        Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = Color.White)
-        ) {
-            Column(
-                modifier = Modifier.padding(20.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                Text(title, fontSize = 18.sp, fontWeight = FontWeight.Black, color = Color(0xFF007A48))
-                Spacer(modifier = Modifier.height(6.dp))
-
-                OutlinedTextField(
-                    value = name,
-                    onValueChange = { name = it },
-                    label = { Text(labelName) },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth().testTag("partner_input_name")
-                )
-
-                OutlinedTextField(
-                    value = phone,
-                    onValueChange = { phone = it },
-                    label = { Text("Contact Phone *") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth().testTag("partner_input_phone")
-                )
-
-                OutlinedTextField(
-                    value = email,
-                    onValueChange = { email = it },
-                    label = { Text("Email (Optional)") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-
-                OutlinedTextField(
-                    value = address,
-                    onValueChange = { address = it },
-                    label = { Text("Shop Address / Area *") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-
-                Spacer(modifier = Modifier.height(10.dp))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    OutlinedButton(onClick = onDismiss, modifier = Modifier.weight(1f)) {
-                        Text("Cancel")
-                    }
-                    Button(
-                        onClick = {
-                            if (name.isNotBlank() && phone.isNotBlank()) {
-                                onSave(name, phone, email, address)
-                            }
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF007A48)),
-                        modifier = Modifier.weight(1.2f).testTag("partner_save_btn")
+                    // Category Selection
+                    Text("Select Skill Segment Category:", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = colors.textSecondary)
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
-                        Text("Save Partner")
+                        val segs = listOf("CMS / WordPress", "Core Frontend", "Backend & DB", "Design & Tools")
+                        segs.forEach { seg ->
+                            val isSel = category == seg
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(if (isSel) colors.primary.copy(alpha = 0.15f) else Color.Transparent)
+                                    .border(1.dp, if (isSel) colors.primary else Color.Transparent, RoundedCornerShape(8.dp))
+                                    .clickable { category = seg }
+                                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                RadioButton(
+                                    selected = isSel,
+                                    onClick = { category = seg },
+                                    colors = RadioButtonDefaults.colors(selectedColor = colors.primary)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = seg,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (isSel) colors.primary else colors.textSecondary
+                                )
+                            }
+                        }
+                    }
+
+                    OutlinedTextField(
+                        value = progressText,
+                        onValueChange = { progressText = it },
+                        label = { Text("Expertise Proficiency (0-100)%") },
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = colors.primary),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        OutlinedButton(
+                            onClick = { skillToEdit = null },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("Cancel")
+                        }
+                        Button(
+                            onClick = {
+                                if (name.isNotBlank()) {
+                                    val progressVal = progressText.toIntOrNull() ?: 90
+                                    viewModel.addSkill(name, progressVal, category)
+                                    skillToEdit = null
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = colors.primary),
+                            modifier = Modifier.weight(1.2f)
+                        ) {
+                            Text("Update Skill")
+                        }
                     }
                 }
             }

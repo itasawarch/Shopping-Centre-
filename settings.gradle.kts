@@ -22,6 +22,6 @@ dependencyResolutionManagement {
   }
 }
 
-rootProject.name = "Zam Zam POS"
+rootProject.name = "Developer Portfolio"
 
 include(":app")

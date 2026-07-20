@@ -19,21 +19,22 @@ class POSRepository(context: Context) {
     val dao = db.posDao()
 
     // --- Flows ---
-    val allProducts: Flow<List<Product>> = dao.getAllProductsFlow()
-    val allCustomers: Flow<List<Customer>> = dao.getAllCustomersFlow()
-    val allSuppliers: Flow<List<Supplier>> = dao.getAllSuppliersFlow()
-    val allSales: Flow<List<Sale>> = dao.getAllSalesFlow()
-    val allPurchases: Flow<List<Purchase>> = dao.getAllPurchasesFlow()
-    val allExpenses: Flow<List<Expense>> = dao.getAllExpensesFlow()
+    val allProjects: Flow<List<Project>> = dao.getAllProjectsFlow()
+    val allServices: Flow<List<Service>> = dao.getAllServicesFlow()
+    val allSkills: Flow<List<Skill>> = dao.getAllSkillsFlow()
+    val allExperiences: Flow<List<Experience>> = dao.getAllExperiencesFlow()
+    val allEducations: Flow<List<Education>> = dao.getAllEducationsFlow()
+    val allTestimonials: Flow<List<Testimonial>> = dao.getAllTestimonialsFlow()
+    val allBlogs: Flow<List<BlogPost>> = dao.getAllBlogsFlow()
+    val allInquiries: Flow<List<Inquiry>> = dao.getAllInquiriesFlow()
 
-    // --- Users & Authentication ---
+    // --- Authentication Support ---
     suspend fun getLoggedInUser(): User? = withContext(Dispatchers.IO) {
         dao.getLoggedInUser()
     }
 
     suspend fun loginUser(username: String, passwordText: String, rememberMe: Boolean = false): User? = withContext(Dispatchers.IO) {
         val user = dao.getUserByUsername(username)
-        // Match raw password as a simple, reliable mock for testing. In prod we'd hash.
         if (user != null && user.passwordHash == passwordText) {
             dao.logoutAllUsers()
             val loggedUser = user.copy(isLogged = true, rememberMe = rememberMe)
@@ -46,22 +47,6 @@ class POSRepository(context: Context) {
 
     suspend fun logoutUser() = withContext(Dispatchers.IO) {
         dao.logoutAllUsers()
-        dao.deactivateAllSessions()
-    }
-
-    // --- Auth Sessions ---
-    suspend fun getActiveAuthSession(): AuthSession? = withContext(Dispatchers.IO) {
-        dao.getActiveSession()
-    }
-
-    suspend fun saveAuthSession(session: AuthSession) = withContext(Dispatchers.IO) {
-        dao.deactivateAllSessions()
-        dao.insertSession(session)
-    }
-
-    suspend fun clearAuthSessions() = withContext(Dispatchers.IO) {
-        dao.deactivateAllSessions()
-        dao.clearAllSessions()
     }
 
     suspend fun registerUser(username: String, passwordText: String, role: String, displayName: String): Boolean = withContext(Dispatchers.IO) {
@@ -80,169 +65,254 @@ class POSRepository(context: Context) {
         }
     }
 
-    // --- Product Operations ---
-    suspend fun saveProduct(product: Product) = withContext(Dispatchers.IO) {
-        dao.insertProduct(product.copy(isSynced = false))
+    suspend fun saveAuthSession(session: AuthSession) = withContext(Dispatchers.IO) {
+        dao.insertSession(session)
     }
 
-    suspend fun updateProduct(product: Product) = withContext(Dispatchers.IO) {
-        dao.updateProduct(product.copy(isSynced = false))
+    suspend fun getActiveAuthSession(): AuthSession? = withContext(Dispatchers.IO) {
+        dao.getActiveSession()
     }
 
-    suspend fun deleteProduct(product: Product) = withContext(Dispatchers.IO) {
-        dao.deleteProduct(product)
+    suspend fun clearAuthSessions() = withContext(Dispatchers.IO) {
+        dao.clearAllSessions()
     }
 
-    suspend fun getProductByBarcode(barcode: String): Product? = withContext(Dispatchers.IO) {
-        dao.getProductByBarcode(barcode)
+    // --- CRUD Project Operations ---
+    suspend fun saveProject(project: Project) = withContext(Dispatchers.IO) {
+        dao.insertProject(project)
     }
 
-    // --- Customer Operations ---
-    suspend fun saveCustomer(customer: Customer) = withContext(Dispatchers.IO) {
-        dao.insertCustomer(customer.copy(isSynced = false))
+    suspend fun deleteProject(project: Project) = withContext(Dispatchers.IO) {
+        dao.deleteProject(project)
     }
 
-    suspend fun updateCustomer(customer: Customer) = withContext(Dispatchers.IO) {
-        dao.updateCustomer(customer.copy(isSynced = false))
+    // --- CRUD Service Operations ---
+    suspend fun saveService(service: Service) = withContext(Dispatchers.IO) {
+        dao.insertService(service)
     }
 
-    suspend fun deleteCustomer(customer: Customer) = withContext(Dispatchers.IO) {
-        dao.deleteCustomer(customer)
+    suspend fun deleteService(service: Service) = withContext(Dispatchers.IO) {
+        dao.deleteService(service)
     }
 
-    // --- Supplier Operations ---
-    suspend fun saveSupplier(supplier: Supplier) = withContext(Dispatchers.IO) {
-        dao.insertSupplier(supplier.copy(isSynced = false))
+    // --- CRUD Skill Operations ---
+    suspend fun saveSkill(skill: Skill) = withContext(Dispatchers.IO) {
+        dao.insertSkill(skill)
     }
 
-    suspend fun updateSupplier(supplier: Supplier) = withContext(Dispatchers.IO) {
-        dao.updateSupplier(supplier.copy(isSynced = false))
+    suspend fun deleteSkill(skill: Skill) = withContext(Dispatchers.IO) {
+        dao.deleteSkill(skill)
     }
 
-    suspend fun deleteSupplier(supplier: Supplier) = withContext(Dispatchers.IO) {
-        dao.deleteSupplier(supplier)
+    // --- CRUD Experience Operations ---
+    suspend fun saveExperience(experience: Experience) = withContext(Dispatchers.IO) {
+        dao.insertExperience(experience)
     }
 
-    // --- Expense Operations ---
-    suspend fun saveExpense(expense: Expense) = withContext(Dispatchers.IO) {
-        dao.insertExpense(expense.copy(isSynced = false))
+    suspend fun deleteExperience(experience: Experience) = withContext(Dispatchers.IO) {
+        dao.deleteExperience(experience)
     }
 
-    suspend fun deleteExpense(expense: Expense) = withContext(Dispatchers.IO) {
-        dao.deleteExpense(expense)
+    // --- CRUD Education Operations ---
+    suspend fun saveEducation(education: Education) = withContext(Dispatchers.IO) {
+        dao.insertEducation(education)
     }
 
-    // --- Sale Billing ---
-    suspend fun checkoutSale(sale: Sale, items: List<SaleItem>) = withContext(Dispatchers.IO) {
-        dao.saveSaleWithItems(sale, items)
+    suspend fun deleteEducation(education: Education) = withContext(Dispatchers.IO) {
+        dao.deleteEducation(education)
     }
 
-    suspend fun returnSaleInvoice(saleId: String) = withContext(Dispatchers.IO) {
-        dao.returnSale(saleId)
+    // --- CRUD Testimonial Operations ---
+    suspend fun saveTestimonial(testimonial: Testimonial) = withContext(Dispatchers.IO) {
+        dao.insertTestimonial(testimonial)
     }
 
-    suspend fun getItemsForSale(saleId: String): List<SaleItem> = withContext(Dispatchers.IO) {
-        dao.getItemsForSale(saleId)
+    suspend fun deleteTestimonial(testimonial: Testimonial) = withContext(Dispatchers.IO) {
+        dao.deleteTestimonial(testimonial)
     }
 
-    // --- Purchase Operations ---
-    suspend fun checkoutPurchase(purchase: Purchase, items: List<PurchaseItem>) = withContext(Dispatchers.IO) {
-        dao.savePurchaseWithItems(purchase, items)
+    // --- CRUD Blog Operations ---
+    suspend fun saveBlog(blog: BlogPost) = withContext(Dispatchers.IO) {
+        dao.insertBlog(blog)
     }
 
-    suspend fun getItemsForPurchase(purchaseId: String): List<PurchaseItem> = withContext(Dispatchers.IO) {
-        dao.getItemsForPurchase(purchaseId)
+    suspend fun deleteBlog(blog: BlogPost) = withContext(Dispatchers.IO) {
+        dao.deleteBlog(blog)
     }
 
-    // --- Simulated Cloud Sync with Firestore ---
-    suspend fun performCloudSync(): SyncSummary = withContext(Dispatchers.IO) {
-        // Find unsynced
-        val upProducts = dao.getUnsyncedProducts().size
-        val upCustomers = dao.getUnsyncedCustomers().size
-        val upSuppliers = dao.getUnsyncedSuppliers().size
-        val upSales = dao.getUnsyncedSales().size
-        val upExpenses = dao.getUnsyncedExpenses().size
-
-        // Simulated cloud roundtrip latency
-        kotlinx.coroutines.delay(1800)
-
-        // Sync local
-        dao.markAllSynced()
-
-        SyncSummary(
-            productsSynced = upProducts,
-            customersSynced = upCustomers,
-            suppliersSynced = upSuppliers,
-            salesSynced = upSales,
-            expensesSynced = upExpenses,
-            totalSynced = upProducts + upCustomers + upSuppliers + upSales + upExpenses,
-            timestamp = System.currentTimeMillis()
-        )
+    // --- CRUD Contact Inquiry Operations ---
+    suspend fun saveInquiry(inquiry: Inquiry) = withContext(Dispatchers.IO) {
+        dao.insertInquiry(inquiry)
     }
 
-    // --- Insert Sample Data Helper ---
+    suspend fun deleteInquiry(inquiry: Inquiry) = withContext(Dispatchers.IO) {
+        dao.deleteInquiry(inquiry)
+    }
+
+    // --- Clear All Tables Helper ---
+    suspend fun clearAllData() = withContext(Dispatchers.IO) {
+        dao.clearAllProjects()
+        dao.clearAllServices()
+        dao.clearAllSkills()
+        dao.clearAllExperiences()
+        dao.clearAllEducations()
+        dao.clearAllTestimonials()
+        dao.clearAllBlogs()
+        dao.clearAllInquiries()
+    }
+
+    // --- Populate Sample Data / One-Click Demo Import ---
     suspend fun populateSampleDataIfEmpty() = withContext(Dispatchers.IO) {
-        // Insert Admin and Manager users if none exist
+        // Create Admin user if none exists
         if (dao.getUserByUsername("admin") == null) {
-            dao.insertUser(User(username = "admin", passwordHash = "admin123", role = "Admin", displayName = "Haji Zam Zam Admin"))
-            dao.insertUser(User(username = "cashier", passwordHash = "cashier123", role = "Cashier", displayName = "Abid Cashier"))
-            dao.insertUser(User(username = "manager", passwordHash = "manager123", role = "Manager", displayName = "Zafar Manager"))
+            dao.insertUser(
+                User(
+                    username = "admin",
+                    passwordHash = "admin123",
+                    role = "Admin",
+                    displayName = "Muhammad Tasawar"
+                )
+            )
         }
 
-        // Insert products if empty
-        val currentProducts = dao.getAllProducts()
-        if (currentProducts.isEmpty()) {
-            val sampleProducts = listOf(
-                Product(name = "Premium Basmati Rice 10kg", sku = "RICE-BAS-10", barcode = "890123456001", category = "Groceries", brand = "Super Kernel", unit = "Pack", purchasePrice = 2800.0, retailPrice = 3300.0, wholesalePrice = 3150.0, stockQuantity = 45, minStockAlert = 10, expiryDate = "2027-12-01"),
-                Product(name = "Dal Chana (Premium) 1kg", sku = "DAL-CHANA-01", barcode = "890123456002", category = "Groceries", brand = "Zam Zam Foods", unit = "Kg", purchasePrice = 260.0, retailPrice = 320.0, wholesalePrice = 295.0, stockQuantity = 120, minStockAlert = 20, expiryDate = "2027-06-15"),
-                Product(name = "Sufi Cooking Oil 5 Liter", sku = "OIL-SUFI-05", barcode = "890123456003", category = "Cooking Essentials", brand = "Sufi", unit = "Cane", purchasePrice = 2450.0, retailPrice = 2750.0, wholesalePrice = 2620.0, stockQuantity = 30, minStockAlert = 5, expiryDate = "2027-03-30"),
-                Product(name = "Lipton Yellow Label Tea 950g", sku = "TEA-LIP-950", barcode = "890123456004", category = "Beverages", brand = "Unilever", unit = "Box", purchasePrice = 1450.0, retailPrice = 1680.0, wholesalePrice = 1550.0, stockQuantity = 8, minStockAlert = 12, expiryDate = "2028-01-01"), // trigger low stock alert
-                Product(name = "Lux Velvet Touch Soap 150g", sku = "SOAP-LUX-150", barcode = "890123456005", category = "Personal Care", brand = "Lux", unit = "Bar", purchasePrice = 120.0, retailPrice = 150.0, wholesalePrice = 135.0, stockQuantity = 150, minStockAlert = 25, expiryDate = "2029-04-10"),
-                Product(name = "Colgate MaxFresh Paste 150g", sku = "PASTE-COL-150", barcode = "890123456006", category = "Personal Care", brand = "Colgate", unit = "Tube", purchasePrice = 240.0, retailPrice = 300.0, wholesalePrice = 270.0, stockQuantity = 0, minStockAlert = 15, expiryDate = "2028-08-20") // Out of Stock alert
+        val projectsList = dao.getAllProjects()
+        if (projectsList.isEmpty()) {
+            // Seed default services
+            val services = listOf(
+                Service(title = "WordPress Website Development", description = "Professional, custom-coded or Elementor-based websites tailored to your brand.", iconName = "DeveloperMode"),
+                Service(title = "Custom WordPress Design", description = "Hand-crafted pixel-perfect designs with unique Gutenberg blocks and layouts.", iconName = "Palette"),
+                Service(title = "E-Commerce Website", description = "Full-featured WooCommerce store integration with secured checkout and payment gateways.", iconName = "ShoppingCart"),
+                Service(title = "Business Website", description = "High-performance websites representing corporate brands, service agencies, or startups.", iconName = "Business"),
+                Service(title = "Portfolio Website", description = "Interactive CV and showcase sites with beautiful layouts and dark/light toggles.", iconName = "AccountBox"),
+                Service(title = "Landing Page Design", description = "Conversion-rate optimized landing pages for marketing, newsletters, or sales funnels.", iconName = "Campaign"),
+                Service(title = "Website Speed Optimization", description = "Lightning-fast optimization of Core Web Vitals, images, scripts, and database.", iconName = "Speed"),
+                Service(title = "Website Maintenance", description = "Scheduled health checks, updates, bug fixes, and security patches.", iconName = "SettingsSuggest"),
+                Service(title = "Bug Fixing", description = "Fast, expert troubleshooting of WordPress, PHP, JavaScript, CSS, or MySQL errors.", iconName = "BugReport"),
+                Service(title = "Website Migration", description = "Zero-downtime secure migration of websites to any host or domain.", iconName = "SwapHoriz"),
+                Service(title = "SEO Optimization", description = "Technical SEO, meta configurations, schema markup, and robots.txt setup.", iconName = "TrendingUp"),
+                Service(title = "Technical Support", description = "24/7 priority support and training for content editors.", iconName = "SupportAgent")
             )
-            sampleProducts.forEach { dao.insertProduct(it) }
-        }
+            services.forEach { dao.insertService(it) }
 
-        // Insert customers if empty
-        val currentCustomers = dao.getAllCustomers()
-        if (currentCustomers.isEmpty()) {
-            val sampleCustomers = listOf(
-                Customer(name = "Imran Khan Retailer", phone = "03001234567", email = "imran@gmail.com", address = "Main Bazaar Ghalanai", balance = -45000.0), // owes 45,000 PKR
-                Customer(name = "Muhammad Ali", phone = "03219876543", email = "ali@yahoo.com", address = "Sector F-11 Islamabad", balance = 0.0),
-                Customer(name = "Kashif Traders", phone = "03124567890", email = "kashiftraders@gmail.com", address = "Karkhano Market Peshawar", balance = -125000.0) // owes 125,000 PKR
+            // Seed default skills
+            val skills = listOf(
+                Skill(name = "WordPress", progress = 95, category = "CMS / WordPress"),
+                Skill(name = "HTML", progress = 90, category = "Core Frontend"),
+                Skill(name = "CSS", progress = 90, category = "Core Frontend"),
+                Skill(name = "JavaScript", progress = 85, category = "Core Frontend"),
+                Skill(name = "PHP", progress = 85, category = "Backend & DB"),
+                Skill(name = "MySQL", progress = 80, category = "Backend & DB"),
+                Skill(name = "Responsive Design", progress = 95, category = "Core Frontend"),
+                Skill(name = "Elementor", progress = 95, category = "CMS / WordPress"),
+                Skill(name = "WooCommerce", progress = 90, category = "CMS / WordPress"),
+                Skill(name = "SEO", progress = 85, category = "Design & Tools"),
+                Skill(name = "GitHub", progress = 80, category = "Design & Tools"),
+                Skill(name = "Firebase", progress = 75, category = "Backend & DB"),
+                Skill(name = "Flutter (Basic)", progress = 65, category = "Design & Tools"),
+                Skill(name = "UI/UX Design", progress = 80, category = "Design & Tools")
             )
-            sampleCustomers.forEach { dao.insertCustomer(it) }
-        }
+            skills.forEach { dao.insertSkill(it) }
 
-        // Insert suppliers if empty
-        val currentSuppliers = dao.getAllSuppliers()
-        if (currentSuppliers.isEmpty()) {
-            val sampleSuppliers = listOf(
-                Supplier(name = "Peshawar WholeSale House", phone = "03339112233", email = "pesh_wholesale@gmail.com", address = "Rampura Bazaar Peshawar", balance = 85000.0),
-                Supplier(name = "Nestle Pakistan Distributors", phone = "042111637853", email = "nestledist@nestle.com.pk", address = "Quetta Highway Multan", balance = 0.0)
+            // Seed default experiences
+            val experiences = listOf(
+                Experience(role = "Senior Web Developer & WP Consultant", company = "Freelance Agency", period = "2022 - Present", description = "Lead development of 120+ custom WordPress platforms and Elementor sites globally. Designed layouts that optimize SEO and mobile loading speed.", type = "Freelance"),
+                Experience(role = "Senior Software Engineer", company = "Tech Solutions Corp", period = "2020 - 2022", description = "Architected complex web APIs and optimized database performance, reducing cloud-server load times by 45%. Conducted code reviews and led a team of 4 engineers.", type = "Professional"),
+                Experience(role = "Full-Stack Web Developer Intern", company = "Innovate Systems", period = "2019 - 2020", description = "Engineered responsive modern PHP pages and integrated payment gateway channels (Stripe, Paypal) for high-traffic e-commerce hubs.", type = "Internship"),
+                Experience(role = "Web Development Mentor", company = "Code Academy", period = "2018 - 2019", description = "Mentored 200+ students in responsive CSS Grid/Flexbox styling, PHP programming, and dynamic theme hooks on WordPress.", type = "Teaching")
             )
-            sampleSuppliers.forEach { dao.insertSupplier(it) }
-        }
+            experiences.forEach { dao.insertExperience(it) }
 
-        // Insert expenses if empty
-        val currentExpensesList = dao.getUnsyncedExpenses()
-        if (currentExpensesList.isEmpty()) {
-            val sampleExpenses = listOf(
-                Expense(category = "Electricity Bill", amount = 14500.0, description = "Zam Zam Shop June Electricity Bill"),
-                Expense(category = "Staff Salaries", amount = 45000.0, description = "Salary paid to Cashier Abid"),
-                Expense(category = "Shop Rent", amount = 60000.0, description = "Monthly rent for Ground Floor")
+            // Seed default educations
+            val educations = listOf(
+                Education(degree = "BS Software Engineering", institution = "National University of Sciences", period = "2016 - 2020", description = "Graduated with honors. Focused on Software Architecture, Web Application Architectures, and Relational Databases."),
+                Education(degree = "Certified WordPress Developer", institution = "WPMU DEV Academy", period = "2021", description = "Professional credential specializing in advanced hook hooks, theme file directory design, database indexing, and custom multisite setups."),
+                Education(degree = "Advanced E-Commerce Architect", institution = "Google Digital Garage", period = "2022", description = "Expert certification in digital marketing, Google Analytics event tracking, conversion-rate optimization (CRO), and Local SEO configurations."),
+                Education(degree = "Responsive Web Design Specialist", institution = "freeCodeCamp", period = "2020", description = "Comprehensive credential covering accessible typography, WCAG contrast standards, CSS Media queries, and grid-breaking visual asymmetry.")
             )
-            sampleExpenses.forEach { dao.insertExpense(it) }
+            educations.forEach { dao.insertEducation(it) }
+
+            // Seed default projects
+            val projects = listOf(
+                Project(
+                    title = "EcoShop Storefront",
+                    description = "Premium green-tech e-commerce catalog featuring highly responsive grid listings, custom attribute filtering, and speed-optimized WooCommerce flows.",
+                    technologies = "WordPress, WooCommerce, Elementor, Stripe, PHP",
+                    imageUrl = "https://images.unsplash.com/photo-1472851294608-062f824d29cc?auto=format&fit=crop&q=80&w=400",
+                    demoUrl = "https://eco-shop-demo.example.com",
+                    githubUrl = "https://github.com/tasawar/ecoshop-woo",
+                    isFeatured = true,
+                    category = "WordPress"
+                ),
+                Project(
+                    title = "MedHub Medical Portal",
+                    description = "Fast-loading online patient appointment booking and scheduling clinical dashboard styled with clean, custom meta-fields and accessible layouts.",
+                    technologies = "WordPress, Custom Post Types, PHP, MySQL, CSS",
+                    imageUrl = "https://images.unsplash.com/photo-1505751172876-fa1923c5c528?auto=format&fit=crop&q=80&w=400",
+                    demoUrl = "https://medhub-portal.example.com",
+                    githubUrl = "https://github.com/tasawar/medhub-portal",
+                    isFeatured = true,
+                    category = "Web"
+                ),
+                Project(
+                    title = "Modern Agency Showcase",
+                    description = "Conversion-optimized landing page featuring animated key counters, sticky headers, a collapsible newsletter subscription bar, and 100/100 Core Web Vitals.",
+                    technologies = "WordPress, Gutenberg Blocks, Elementor, CSS Optimization",
+                    imageUrl = "https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&q=80&w=400",
+                    demoUrl = "https://agency-speed-demo.example.com",
+                    githubUrl = "https://github.com/tasawar/modern-agency-wp",
+                    isFeatured = false,
+                    category = "WordPress"
+                ),
+                Project(
+                    title = "Personal Portfolio App",
+                    description = "Elegant Jetpack Compose Showcase application featuring native dark mode toggles, localized SQLite Room caching, and animated visual timeline components.",
+                    technologies = "Kotlin, Jetpack Compose, Room DB, Coil",
+                    imageUrl = "https://images.unsplash.com/photo-1517694712202-14dd9538aa97?auto=format&fit=crop&q=80&w=400",
+                    demoUrl = "https://ais-dev-t5nwckh7aktofzbkfmlx36-264201700240.asia-southeast1.run.app",
+                    githubUrl = "https://github.com/tasawar/compose-developer-portfolio",
+                    isFeatured = true,
+                    category = "Mobile"
+                )
+            )
+            projects.forEach { dao.insertProject(it) }
+
+            // Seed testimonials
+            val testimonials = listOf(
+                Testimonial(clientName = "Sarah Jenkins", company = "CEO @ GreenCo", rating = 5, feedback = "Tasawar is an incredible software engineer. He built our EcoShop storefront with incredible visual polish. Page-load speeds decreased significantly, and WooCommerce checkouts are smooth on mobile devices!"),
+                Testimonial(clientName = "Abdul Rehman", company = "Founder @ MedHub", rating = 5, feedback = "Exceptional WordPress designer and PHP troubleshooter. He successfully indexed a custom post query that was lagging, and completed our medical system migration with absolutely zero downtime."),
+                Testimonial(clientName = "Sophia Liang", company = "Product Director @ DesignLab", rating = 5, feedback = "A true professional. He converted our Figma designs into responsive, accessible Gutenberg blocks. Highly communicative and deliver fast!")
+            )
+            testimonials.forEach { dao.insertTestimonial(it) }
+
+            // Seed default blogs
+            val blogs = listOf(
+                BlogPost(
+                    title = "Website Speed Optimization: The Ultimate Guide",
+                    content = "Site performance directly impacts your conversions and Google SEO rankings. In this technical deep-dive, we explore how configuring image lazy-loading, serving next-gen webp images, minifying critical CSS paths, and utilizing Redis object-caching can bring your page loading speeds down to less than 1.5 seconds. Learn the hooks and setup rules that elevate your Google PageSpeed scores to a perfect 100/100.",
+                    category = "Speed & Performance",
+                    date = "July 15, 2026"
+                ),
+                BlogPost(
+                    title = "Demystifying Custom Gutenberg Blocks",
+                    content = "While visual page builders like Elementor are great for rapid layout generation, custom-coded block themes built with Gutenberg offer unmatched, bloat-free load speeds. In this tutorial, we will write a responsive custom hero slider using PHP rendering and Tailwind CSS. Learn how to design a pixel-perfect, Gutenberg-friendly experience with custom meta keys.",
+                    category = "WordPress Development",
+                    date = "July 10, 2026"
+                ),
+                BlogPost(
+                    title = "Technical SEO Best Practices for WooCommerce",
+                    content = "Succeeding in dynamic e-commerce requires search crawlers to fully index your products. Explore why adding robust Product Schema markup, configuring custom XML sitemaps, optimizing image alt tag descriptors, and fine-tuning robots.txt parameters can drive higher organic search impressions. Learn about configuring breadcrumb structured-data in a couple of minutes.",
+                    category = "SEO & Marketing",
+                    date = "July 02, 2026"
+                )
+            )
+            blogs.forEach { dao.insertBlog(it) }
+
+            // Seed inquiries
+            val inquiries = listOf(
+                Inquiry(name = "John Doe", email = "john.doe@example.com", phone = "0321-4433221", message = "Hi Tasawar, I would love to hire you to build a custom WordPress business directory. It requires advanced filtering and WooCommerce support. Let's schedule a call!", status = "Unread"),
+                Inquiry(name = "Kamil Shah", email = "kamil.shah@innovate.pk", phone = "0312-5566778", message = "Hello, your speed optimization services are exactly what our startup needs. Our store takes 5+ seconds to load. Do you have availability next week?", status = "Unread")
+            )
+            inquiries.forEach { dao.insertInquiry(it) }
         }
     }
 }
-
-data class SyncSummary(
-    val productsSynced: Int,
-    val customersSynced: Int,
-    val suppliersSynced: Int,
-    val salesSynced: Int,
-    val expensesSynced: Int,
-    val totalSynced: Int,
-    val timestamp: Long
-)

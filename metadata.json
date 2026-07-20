@@ -1,6 +1,6 @@
 {
-  "name": "Zam Zam POS",
-  "description": "Enterprise-level offline-first Shop Management & POS System for Zam Zam Whole Sale & Shopping Centre",
+  "name": "Developer Portfolio",
+  "description": "Professional Software Engineer & Web Developer Showcase Portfolio with Projects, Experience, and Interactive Admin Panel",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

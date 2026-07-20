@@ -5,15 +5,15 @@ import kotlinx.coroutines.flow.Flow
 import java.util.UUID
 
 // ==========================================
-// 1. DATABASE ENTITIES (String UUIDs for Sync)
+// 1. PORTFOLIO ENTITIES
 // ==========================================
 
 @Entity(tableName = "users")
 data class User(
     @PrimaryKey val id: String = UUID.randomUUID().toString(),
     val username: String,
-    val passwordHash: String, // Simulated hashing
-    val role: String, // "Admin", "Manager", "Cashier", "Employee"
+    val passwordHash: String,
+    val role: String, // "Admin", "Manager", "Viewer"
     val displayName: String,
     val rememberMe: Boolean = false,
     val isLogged: Boolean = false
@@ -26,418 +26,93 @@ data class AuthSession(
     val role: String,
     val username: String,
     val displayName: String,
-    val permissions: String, // Comma-separated permissions list (e.g., "READ_REPORTS,WRITE_PRODUCTS,MANAGE_SETTINGS")
+    val permissions: String,
     val loginTimestamp: Long = System.currentTimeMillis(),
-    val expiresAt: Long = System.currentTimeMillis() + (30 * 24 * 60 * 60 * 1000L), // 30 Days expiration
+    val expiresAt: Long = System.currentTimeMillis() + (30 * 24 * 60 * 60 * 1000L),
     val isActive: Boolean = true
 )
 
-@Entity(
-    tableName = "products",
-    indices = [
-        Index(value = ["sku"], unique = true),
-        Index(value = ["barcode"]),
-        Index(value = ["category"])
-    ]
-)
-data class Product(
+@Entity(tableName = "projects")
+data class Project(
     @PrimaryKey val id: String = UUID.randomUUID().toString(),
-    val name: String,
-    val sku: String,
-    val barcode: String,
-    val category: String,
-    val brand: String,
-    val unit: String,
-    val purchasePrice: Double,
-    val retailPrice: Double,
-    val wholesalePrice: Double,
-    val stockQuantity: Int,
-    val minStockAlert: Int,
-    val expiryDate: String, // "YYYY-MM-DD"
-    val imagePath: String = "",
-    val isSynced: Boolean = false,
-    val lastUpdated: Long = System.currentTimeMillis()
-) {
-    // --- Business Analytics & Metrics ---
-    fun isLowStock(): Boolean = stockQuantity <= minStockAlert && stockQuantity > 0
-    fun isOutOfStock(): Boolean = stockQuantity <= 0
-    
-    fun getRetailMarginAmount(): Double = retailPrice - purchasePrice
-    fun getWholesaleMarginAmount(): Double = wholesalePrice - purchasePrice
-    
-    fun getRetailMarginPercentage(): Double {
-        return if (purchasePrice > 0) (getRetailMarginAmount() / purchasePrice) * 100.0 else 0.0
-    }
-    
-    fun getWholesaleMarginPercentage(): Double {
-        return if (purchasePrice > 0) (getWholesaleMarginAmount() / purchasePrice) * 100.0 else 0.0
-    }
-    
-    fun getWholesaleStockValue(): Double = stockQuantity * wholesalePrice
-    fun getRetailStockValue(): Double = stockQuantity * retailPrice
-    fun getPurchaseStockValue(): Double = stockQuantity * purchasePrice
-
-    // --- Data Sync Mappers (Local SQLite Room Entity <-> Cloud Firestore Document Map) ---
-    fun toFirestoreMap(): Map<String, Any?> {
-        return mapOf(
-            "id" to id,
-            "name" to name,
-            "sku" to sku,
-            "barcode" to barcode,
-            "category" to category,
-            "brand" to brand,
-            "unit" to unit,
-            "purchasePrice" to purchasePrice,
-            "retailPrice" to retailPrice,
-            "wholesalePrice" to wholesalePrice,
-            "stockQuantity" to stockQuantity,
-            "minStockAlert" to minStockAlert,
-            "expiryDate" to expiryDate,
-            "imagePath" to imagePath,
-            "lastUpdated" to lastUpdated
-        )
-    }
-
-    companion object {
-        fun fromFirestoreMap(id: String, map: Map<String, Any?>): Product {
-            return Product(
-                id = id,
-                name = map["name"] as? String ?: "",
-                sku = map["sku"] as? String ?: "",
-                barcode = map["barcode"] as? String ?: "",
-                category = map["category"] as? String ?: "",
-                brand = map["brand"] as? String ?: "",
-                unit = map["unit"] as? String ?: "",
-                purchasePrice = (map["purchasePrice"] as? Number)?.toDouble() ?: 0.0,
-                retailPrice = (map["retailPrice"] as? Number)?.toDouble() ?: 0.0,
-                wholesalePrice = (map["wholesalePrice"] as? Number)?.toDouble() ?: 0.0,
-                stockQuantity = (map["stockQuantity"] as? Number)?.toInt() ?: 0,
-                minStockAlert = (map["minStockAlert"] as? Number)?.toInt() ?: 0,
-                expiryDate = map["expiryDate"] as? String ?: "",
-                imagePath = map["imagePath"] as? String ?: "",
-                isSynced = true, // Received from server, so initially synced
-                lastUpdated = (map["lastUpdated"] as? Number)?.toLong() ?: System.currentTimeMillis()
-            )
-        }
-        
-        // --- Validation Engine ---
-        fun validate(
-            name: String,
-            sku: String,
-            purchasePrice: Double,
-            retailPrice: Double,
-            wholesalePrice: Double,
-            stockQuantity: Int
-        ): ProductValidationResult {
-            if (name.isBlank()) return ProductValidationResult.Error("Product name cannot be empty")
-            if (sku.isBlank()) return ProductValidationResult.Error("SKU code cannot be empty")
-            if (purchasePrice < 0) return ProductValidationResult.Error("Purchase price cannot be negative")
-            if (retailPrice < 0) return ProductValidationResult.Error("Retail price cannot be negative")
-            if (wholesalePrice < 0) return ProductValidationResult.Error("Wholesale price cannot be negative")
-            if (stockQuantity < 0) return ProductValidationResult.Error("Stock level cannot be negative")
-            if (retailPrice < purchasePrice) return ProductValidationResult.Error("Warning: Retail price is lower than purchase cost")
-            return ProductValidationResult.Valid
-        }
-    }
-}
-
-sealed class ProductValidationResult {
-    object Valid : ProductValidationResult()
-    data class Error(val message: String) : ProductValidationResult()
-}
-
-@Entity(
-    tableName = "customers",
-    indices = [Index(value = ["phone"])]
-)
-data class Customer(
-    @PrimaryKey val id: String = UUID.randomUUID().toString(),
-    val name: String,
-    val phone: String,
-    val email: String,
-    val address: String,
-    val balance: Double = 0.0, // negative is debit, positive is credit
-    val isSynced: Boolean = false,
-    val lastUpdated: Long = System.currentTimeMillis()
-) {
-    fun hasOutstandingDues(): Boolean = balance < 0.0
-    fun getAbsoluteBalance(): Double = kotlin.math.abs(balance)
-
-    fun toFirestoreMap(): Map<String, Any?> {
-        return mapOf(
-            "id" to id,
-            "name" to name,
-            "phone" to phone,
-            "email" to email,
-            "address" to address,
-            "balance" to balance,
-            "lastUpdated" to lastUpdated
-        )
-    }
-
-    companion object {
-        fun fromFirestoreMap(id: String, map: Map<String, Any?>): Customer {
-            return Customer(
-                id = id,
-                name = map["name"] as? String ?: "",
-                phone = map["phone"] as? String ?: "",
-                email = map["email"] as? String ?: "",
-                address = map["address"] as? String ?: "",
-                balance = (map["balance"] as? Number)?.toDouble() ?: 0.0,
-                isSynced = true,
-                lastUpdated = (map["lastUpdated"] as? Number)?.toLong() ?: System.currentTimeMillis()
-            )
-        }
-
-        fun validate(name: String, phone: String, email: String): CustomerValidationResult {
-            if (name.isBlank()) return CustomerValidationResult.Error("Customer name is required")
-            if (phone.isBlank()) return CustomerValidationResult.Error("Phone number is required")
-            if (email.isNotBlank() && !email.contains("@")) return CustomerValidationResult.Error("Invalid email address format")
-            return CustomerValidationResult.Valid
-        }
-    }
-}
-
-sealed class CustomerValidationResult {
-    object Valid : CustomerValidationResult()
-    data class Error(val message: String) : CustomerValidationResult()
-}
-
-@Entity(
-    tableName = "suppliers",
-    indices = [Index(value = ["phone"])]
-)
-data class Supplier(
-    @PrimaryKey val id: String = UUID.randomUUID().toString(),
-    val name: String,
-    val phone: String,
-    val email: String,
-    val address: String,
-    val balance: Double = 0.0,
-    val isSynced: Boolean = false,
-    val lastUpdated: Long = System.currentTimeMillis()
-) {
-    fun toFirestoreMap(): Map<String, Any?> {
-        return mapOf(
-            "id" to id,
-            "name" to name,
-            "phone" to phone,
-            "email" to email,
-            "address" to address,
-            "balance" to balance,
-            "lastUpdated" to lastUpdated
-        )
-    }
-
-    companion object {
-        fun fromFirestoreMap(id: String, map: Map<String, Any?>): Supplier {
-            return Supplier(
-                id = id,
-                name = map["name"] as? String ?: "",
-                phone = map["phone"] as? String ?: "",
-                email = map["email"] as? String ?: "",
-                address = map["address"] as? String ?: "",
-                balance = (map["balance"] as? Number)?.toDouble() ?: 0.0,
-                isSynced = true,
-                lastUpdated = (map["lastUpdated"] as? Number)?.toLong() ?: System.currentTimeMillis()
-            )
-        }
-
-        fun validate(name: String, phone: String, email: String): SupplierValidationResult {
-            if (name.isBlank()) return SupplierValidationResult.Error("Supplier name is required")
-            if (phone.isBlank()) return SupplierValidationResult.Error("Phone number is required")
-            if (email.isNotBlank() && !email.contains("@")) return SupplierValidationResult.Error("Invalid email address format")
-            return SupplierValidationResult.Valid
-        }
-    }
-}
-
-sealed class SupplierValidationResult {
-    object Valid : SupplierValidationResult()
-    data class Error(val message: String) : SupplierValidationResult()
-}
-
-@Entity(
-    tableName = "sales",
-    indices = [
-        Index(value = ["timestamp"]),
-        Index(value = ["customerId"])
-    ]
-)
-data class Sale(
-    @PrimaryKey val id: String = UUID.randomUUID().toString(),
-    val timestamp: Long = System.currentTimeMillis(),
-    val customerId: String,
-    val customerName: String,
-    val subtotal: Double,
-    val discount: Double,
-    val tax: Double,
-    val totalAmount: Double,
-    val paymentMethod: String, // "Cash", "Card", "JazzCash", "EasyPaisa", "Bank Transfer", "On Credit"
-    val cashierName: String,
-    val status: String = "Completed", // "Completed", "On Hold", "Returned"
-    val isSynced: Boolean = false
-) {
-    fun toFirestoreMap(): Map<String, Any?> {
-        return mapOf(
-            "id" to id,
-            "timestamp" to timestamp,
-            "customerId" to customerId,
-            "customerName" to customerName,
-            "subtotal" to subtotal,
-            "discount" to discount,
-            "tax" to tax,
-            "totalAmount" to totalAmount,
-            "paymentMethod" to paymentMethod,
-            "cashierName" to cashierName,
-            "status" to status
-        )
-    }
-
-    companion object {
-        fun fromFirestoreMap(id: String, map: Map<String, Any?>): Sale {
-            return Sale(
-                id = id,
-                timestamp = (map["timestamp"] as? Number)?.toLong() ?: System.currentTimeMillis(),
-                customerId = map["customerId"] as? String ?: "GUEST",
-                customerName = map["customerName"] as? String ?: "Guest Customer",
-                subtotal = (map["subtotal"] as? Number)?.toDouble() ?: 0.0,
-                discount = (map["discount"] as? Number)?.toDouble() ?: 0.0,
-                tax = (map["tax"] as? Number)?.toDouble() ?: 0.0,
-                totalAmount = (map["totalAmount"] as? Number)?.toDouble() ?: 0.0,
-                paymentMethod = map["paymentMethod"] as? String ?: "Cash",
-                cashierName = map["cashierName"] as? String ?: "Cashier",
-                status = map["status"] as? String ?: "Completed",
-                isSynced = true
-            )
-        }
-
-        fun validate(totalAmount: Double, paymentMethod: String): SaleValidationResult {
-            if (totalAmount <= 0) return SaleValidationResult.Error("Total sale amount must be greater than zero")
-            if (paymentMethod.isBlank()) return SaleValidationResult.Error("Payment method must be selected")
-            return SaleValidationResult.Valid
-        }
-    }
-}
-
-sealed class SaleValidationResult {
-    object Valid : SaleValidationResult()
-    data class Error(val message: String) : SaleValidationResult()
-}
-
-@Entity(
-    tableName = "sale_items",
-    indices = [
-        Index(value = ["saleId"]),
-        Index(value = ["productId"])
-    ]
-)
-data class SaleItem(
-    @PrimaryKey(autoGenerate = true) val id: Int = 0,
-    val saleId: String,
-    val productId: String,
-    val productName: String,
-    val quantity: Int,
-    val purchasePrice: Double, // Cost price at time of sale
-    val salePrice: Double, // Selling price at time of sale
-    val totalLinePrice: Double
-) {
-    fun getLineProfit(): Double = totalLinePrice - (purchasePrice * quantity)
-    fun getLineCost(): Double = purchasePrice * quantity
-
-    fun toFirestoreMap(): Map<String, Any?> {
-        return mapOf(
-            "saleId" to saleId,
-            "productId" to productId,
-            "productName" to productName,
-            "quantity" to quantity,
-            "purchasePrice" to purchasePrice,
-            "salePrice" to salePrice,
-            "totalLinePrice" to totalLinePrice
-        )
-    }
-
-    companion object {
-        fun fromFirestoreMap(map: Map<String, Any?>): SaleItem {
-            return SaleItem(
-                saleId = map["saleId"] as? String ?: "",
-                productId = map["productId"] as? String ?: "",
-                productName = map["productName"] as? String ?: "",
-                quantity = (map["quantity"] as? Number)?.toInt() ?: 0,
-                purchasePrice = (map["purchasePrice"] as? Number)?.toDouble() ?: 0.0,
-                salePrice = (map["salePrice"] as? Number)?.toDouble() ?: 0.0,
-                totalLinePrice = (map["totalLinePrice"] as? Number)?.toDouble() ?: 0.0
-            )
-        }
-    }
-}
-
-@Entity(
-    tableName = "purchases",
-    indices = [
-        Index(value = ["timestamp"]),
-        Index(value = ["supplierId"])
-    ]
-)
-data class Purchase(
-    @PrimaryKey val id: String = UUID.randomUUID().toString(),
-    val timestamp: Long = System.currentTimeMillis(),
-    val supplierId: String,
-    val supplierName: String,
-    val totalAmount: Double,
-    val status: String = "Completed", // "Completed", "Returned"
-    val isSynced: Boolean = false
-)
-
-@Entity(
-    tableName = "purchase_items",
-    indices = [
-        Index(value = ["purchaseId"]),
-        Index(value = ["productId"])
-    ]
-)
-data class PurchaseItem(
-    @PrimaryKey(autoGenerate = true) val id: Int = 0,
-    val purchaseId: String,
-    val productId: String,
-    val productName: String,
-    val quantity: Int,
-    val purchasePrice: Double,
-    val totalLinePrice: Double
-)
-
-@Entity(
-    tableName = "expenses",
-    indices = [
-        Index(value = ["timestamp"])
-    ]
-)
-data class Expense(
-    @PrimaryKey val id: String = UUID.randomUUID().toString(),
-    val category: String,
-    val amount: Double,
+    val title: String,
     val description: String,
-    val timestamp: Long = System.currentTimeMillis(),
-    val isSynced: Boolean = false
+    val technologies: String, // Comma separated list (e.g. "WordPress, PHP, MySQL, CSS")
+    val imageUrl: String,
+    val demoUrl: String,
+    val githubUrl: String,
+    val isFeatured: Boolean = false,
+    val category: String = "Web" // "Web", "WordPress", "Mobile", "UI/UX"
 )
 
-@Entity(
-    tableName = "audit_logs",
-    indices = [
-        Index(value = ["timestamp"])
-    ]
-)
-data class AuditLog(
+@Entity(tableName = "services")
+data class Service(
     @PrimaryKey val id: String = UUID.randomUUID().toString(),
+    val title: String,
+    val description: String,
+    val iconName: String // Icon name token mapped to Material Icons
+)
+
+@Entity(tableName = "skills")
+data class Skill(
+    @PrimaryKey val id: String = UUID.randomUUID().toString(),
+    val name: String,
+    val progress: Int, // 0 to 100
+    val category: String // "Core Frontend", "Backend & DB", "CMS / WordPress", "Design & Tools"
+)
+
+@Entity(tableName = "experiences")
+data class Experience(
+    @PrimaryKey val id: String = UUID.randomUUID().toString(),
+    val role: String,
+    val company: String,
+    val period: String, // "2024 - Present"
+    val description: String,
+    val type: String // "Professional", "Freelance", "Internship", "Teaching"
+)
+
+@Entity(tableName = "educations")
+data class Education(
+    @PrimaryKey val id: String = UUID.randomUUID().toString(),
+    val degree: String,
+    val institution: String,
+    val period: String,
+    val description: String
+)
+
+@Entity(tableName = "testimonials")
+data class Testimonial(
+    @PrimaryKey val id: String = UUID.randomUUID().toString(),
+    val clientName: String,
+    val feedback: String,
+    val rating: Int, // 1 to 5
+    val company: String
+)
+
+@Entity(tableName = "blogs")
+data class BlogPost(
+    @PrimaryKey val id: String = UUID.randomUUID().toString(),
+    val title: String,
+    val content: String,
+    val category: String,
+    val date: String,
+    val author: String = "Muhammad Tasawar",
+    val imageUrl: String = ""
+)
+
+@Entity(tableName = "inquiries")
+data class Inquiry(
+    @PrimaryKey val id: String = UUID.randomUUID().toString(),
+    val name: String,
+    val email: String,
+    val phone: String,
+    val message: String,
     val timestamp: Long = System.currentTimeMillis(),
-    val userId: String,
-    val userName: String,
-    val action: String, // "ADD_PRODUCT", "POS_SALE", "SYNC", etc.
-    val details: String
+    val status: String = "Unread" // "Unread", "Replied", "Archived"
 )
 
 // ==========================================
-// 2. DATA ACCESS OBJECTS (DAOs)
+// 2. DATA ACCESS OBJECT (DAO)
 // ==========================================
 
 @Dao
@@ -472,236 +147,153 @@ interface POSDao {
     @Query("DELETE FROM auth_sessions")
     suspend fun clearAllSessions()
 
-    // --- Products ---
-    @Query("SELECT * FROM products ORDER BY name ASC")
-    fun getAllProductsFlow(): Flow<List<Product>>
+    // --- Projects ---
+    @Query("SELECT * FROM projects ORDER BY title ASC")
+    fun getAllProjectsFlow(): Flow<List<Project>>
 
-    @Query("SELECT * FROM products ORDER BY name ASC")
-    suspend fun getAllProducts(): List<Product>
-
-    @Query("SELECT * FROM products WHERE id = :id LIMIT 1")
-    suspend fun getProductById(id: String): Product?
-
-    @Query("SELECT * FROM products WHERE barcode = :barcode LIMIT 1")
-    suspend fun getProductByBarcode(barcode: String): Product?
+    @Query("SELECT * FROM projects")
+    suspend fun getAllProjects(): List<Project>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertProduct(product: Product)
-
-    @Update
-    suspend fun updateProduct(product: Product)
+    suspend fun insertProject(project: Project)
 
     @Delete
-    suspend fun deleteProduct(product: Product)
+    suspend fun deleteProject(project: Project)
 
-    // --- Customers ---
-    @Query("SELECT * FROM customers ORDER BY name ASC")
-    fun getAllCustomersFlow(): Flow<List<Customer>>
+    @Query("DELETE FROM projects")
+    suspend fun clearAllProjects()
 
-    @Query("SELECT * FROM customers ORDER BY name ASC")
-    suspend fun getAllCustomers(): List<Customer>
+    // --- Services ---
+    @Query("SELECT * FROM services ORDER BY title ASC")
+    fun getAllServicesFlow(): Flow<List<Service>>
 
-    @Query("SELECT * FROM customers WHERE id = :id LIMIT 1")
-    suspend fun getCustomerById(id: String): Customer?
+    @Query("SELECT * FROM services")
+    suspend fun getAllServices(): List<Service>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertCustomer(customer: Customer)
-
-    @Update
-    suspend fun updateCustomer(customer: Customer)
+    suspend fun insertService(service: Service)
 
     @Delete
-    suspend fun deleteCustomer(customer: Customer)
+    suspend fun deleteService(service: Service)
 
-    // --- Suppliers ---
-    @Query("SELECT * FROM suppliers ORDER BY name ASC")
-    fun getAllSuppliersFlow(): Flow<List<Supplier>>
+    @Query("DELETE FROM services")
+    suspend fun clearAllServices()
 
-    @Query("SELECT * FROM suppliers ORDER BY name ASC")
-    suspend fun getAllSuppliers(): List<Supplier>
+    // --- Skills ---
+    @Query("SELECT * FROM skills ORDER BY progress DESC")
+    fun getAllSkillsFlow(): Flow<List<Skill>>
+
+    @Query("SELECT * FROM skills")
+    suspend fun getAllSkills(): List<Skill>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertSupplier(supplier: Supplier)
-
-    @Update
-    suspend fun updateSupplier(supplier: Supplier)
+    suspend fun insertSkill(skill: Skill)
 
     @Delete
-    suspend fun deleteSupplier(supplier: Supplier)
+    suspend fun deleteSkill(skill: Skill)
 
-    // --- Sales & Sale Items ---
-    @Query("SELECT * FROM sales ORDER BY timestamp DESC")
-    fun getAllSalesFlow(): Flow<List<Sale>>
+    @Query("DELETE FROM skills")
+    suspend fun clearAllSkills()
 
-    @Query("SELECT * FROM sales ORDER BY timestamp DESC")
-    suspend fun getAllSales(): List<Sale>
+    // --- Experiences ---
+    @Query("SELECT * FROM experiences ORDER BY period DESC")
+    fun getAllExperiencesFlow(): Flow<List<Experience>>
 
-    @Query("SELECT * FROM sales WHERE id = :id LIMIT 1")
-    suspend fun getSaleById(id: String): Sale?
-
-    @Query("SELECT * FROM sale_items WHERE saleId = :saleId")
-    suspend fun getItemsForSale(saleId: String): List<SaleItem>
+    @Query("SELECT * FROM experiences")
+    suspend fun getAllExperiences(): List<Experience>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertSale(sale: Sale)
-
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertSaleItem(item: SaleItem)
-
-    @Transaction
-    suspend fun saveSaleWithItems(sale: Sale, items: List<SaleItem>) {
-        insertSale(sale)
-        items.forEach { item ->
-            insertSaleItem(item)
-            // Deduct stock
-            val product = getProductById(item.productId)
-            if (product != null) {
-                val newStock = (product.stockQuantity - item.quantity).coerceAtLeast(0)
-                updateProduct(product.copy(stockQuantity = newStock, lastUpdated = System.currentTimeMillis()))
-            }
-        }
-        // Update Customer Balance if credit (i.e. Not cash payment or guest)
-        if (sale.customerId != "GUEST" && sale.paymentMethod == "On Credit") {
-            val customer = getCustomerById(sale.customerId)
-            if (customer != null) {
-                updateCustomer(customer.copy(
-                    balance = customer.balance - sale.totalAmount, // Negative balance indicates outstanding dues
-                    lastUpdated = System.currentTimeMillis()
-                ))
-            }
-        }
-    }
-
-    @Transaction
-    suspend fun returnSale(saleId: String) {
-        val sale = getSaleById(saleId) ?: return
-        if (sale.status == "Returned") return // already returned
-        
-        // Update sale status
-        updateSale(sale.copy(status = "Returned", isSynced = false))
-
-        // Return stock
-        val items = getItemsForSale(saleId)
-        items.forEach { item ->
-            val product = getProductById(item.productId)
-            if (product != null) {
-                val newStock = product.stockQuantity + item.quantity
-                updateProduct(product.copy(stockQuantity = newStock, lastUpdated = System.currentTimeMillis()))
-            }
-        }
-
-        // Refund customer credit balance if applicable
-        if (sale.customerId != "GUEST" && sale.paymentMethod == "On Credit") {
-            val customer = getCustomerById(sale.customerId)
-            if (customer != null) {
-                updateCustomer(customer.copy(
-                    balance = customer.balance + sale.totalAmount,
-                    lastUpdated = System.currentTimeMillis()
-                ))
-            }
-        }
-    }
-
-    @Update
-    suspend fun updateSale(sale: Sale)
-
-    // --- Purchases & Purchase Items ---
-    @Query("SELECT * FROM purchases ORDER BY timestamp DESC")
-    fun getAllPurchasesFlow(): Flow<List<Purchase>>
-
-    @Query("SELECT * FROM purchase_items WHERE purchaseId = :purchaseId")
-    suspend fun getItemsForPurchase(purchaseId: String): List<PurchaseItem>
-
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertPurchase(purchase: Purchase)
-
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertPurchaseItem(item: PurchaseItem)
-
-    @Transaction
-    suspend fun savePurchaseWithItems(purchase: Purchase, items: List<PurchaseItem>) {
-        insertPurchase(purchase)
-        items.forEach { item ->
-            insertPurchaseItem(item)
-            // Add stock
-            val product = getProductById(item.productId)
-            if (product != null) {
-                val newStock = product.stockQuantity + item.quantity
-                updateProduct(product.copy(
-                    stockQuantity = newStock, 
-                    purchasePrice = item.purchasePrice, // update cost price to newest purchase price
-                    lastUpdated = System.currentTimeMillis()
-                ))
-            }
-        }
-    }
-
-    // --- Expenses ---
-    @Query("SELECT * FROM expenses ORDER BY timestamp DESC")
-    fun getAllExpensesFlow(): Flow<List<Expense>>
-
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertExpense(expense: Expense)
+    suspend fun insertExperience(experience: Experience)
 
     @Delete
-    suspend fun deleteExpense(expense: Expense)
+    suspend fun deleteExperience(experience: Experience)
 
-    // --- Sync Operations ---
-    @Query("SELECT * FROM products WHERE isSynced = 0")
-    suspend fun getUnsyncedProducts(): List<Product>
+    @Query("DELETE FROM experiences")
+    suspend fun clearAllExperiences()
 
-    @Query("SELECT * FROM customers WHERE isSynced = 0")
-    suspend fun getUnsyncedCustomers(): List<Customer>
+    // --- Educations ---
+    @Query("SELECT * FROM educations ORDER BY period DESC")
+    fun getAllEducationsFlow(): Flow<List<Education>>
 
-    @Query("SELECT * FROM suppliers WHERE isSynced = 0")
-    suspend fun getUnsyncedSuppliers(): List<Supplier>
+    @Query("SELECT * FROM educations")
+    suspend fun getAllEducations(): List<Education>
 
-    @Query("SELECT * FROM sales WHERE isSynced = 0")
-    suspend fun getUnsyncedSales(): List<Sale>
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertEducation(education: Education)
 
-    @Query("SELECT * FROM expenses WHERE isSynced = 0")
-    suspend fun getUnsyncedExpenses(): List<Expense>
+    @Delete
+    suspend fun deleteEducation(education: Education)
 
-    @Transaction
-    suspend fun markAllSynced() {
-        // In a real app we'd upload each to Firestore. Here we bulk-mark them synced.
-        // This is a robust mock simulation of Firebase sync.
-        val products = getUnsyncedProducts()
-        products.forEach { updateProduct(it.copy(isSynced = true)) }
+    @Query("DELETE FROM educations")
+    suspend fun clearAllEducations()
 
-        val customers = getUnsyncedCustomers()
-        customers.forEach { updateCustomer(it.copy(isSynced = true)) }
+    // --- Testimonials ---
+    @Query("SELECT * FROM testimonials")
+    fun getAllTestimonialsFlow(): Flow<List<Testimonial>>
 
-        val suppliers = getUnsyncedSuppliers()
-        suppliers.forEach { updateSupplier(it.copy(isSynced = true)) }
+    @Query("SELECT * FROM testimonials")
+    suspend fun getAllTestimonials(): List<Testimonial>
 
-        val sales = getUnsyncedSales()
-        sales.forEach { updateSale(it.copy(isSynced = true)) }
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertTestimonial(testimonial: Testimonial)
 
-        val expenses = getUnsyncedExpenses()
-        expenses.forEach { insertExpense(it.copy(isSynced = true)) }
-    }
+    @Delete
+    suspend fun deleteTestimonial(testimonial: Testimonial)
+
+    @Query("DELETE FROM testimonials")
+    suspend fun clearAllTestimonials()
+
+    // --- Blogs ---
+    @Query("SELECT * FROM blogs ORDER BY date DESC")
+    fun getAllBlogsFlow(): Flow<List<BlogPost>>
+
+    @Query("SELECT * FROM blogs ORDER BY date DESC")
+    suspend fun getAllBlogs(): List<BlogPost>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertBlog(blog: BlogPost)
+
+    @Delete
+    suspend fun deleteBlog(blog: BlogPost)
+
+    @Query("DELETE FROM blogs")
+    suspend fun clearAllBlogs()
+
+    // --- Inquiries ---
+    @Query("SELECT * FROM inquiries ORDER BY timestamp DESC")
+    fun getAllInquiriesFlow(): Flow<List<Inquiry>>
+
+    @Query("SELECT * FROM inquiries ORDER BY timestamp DESC")
+    suspend fun getAllInquiries(): List<Inquiry>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertInquiry(inquiry: Inquiry)
+
+    @Delete
+    suspend fun deleteInquiry(inquiry: Inquiry)
+
+    @Query("DELETE FROM inquiries")
+    suspend fun clearAllInquiries()
 }
 
 // ==========================================
-// 3. ROOM DATABASE CLASS
+// 3. DATABASE CLASS
 // ==========================================
 
 @Database(
     entities = [
         User::class,
         AuthSession::class,
-        Product::class,
-        Customer::class,
-        Supplier::class,
-        Sale::class,
-        SaleItem::class,
-        Purchase::class,
-        PurchaseItem::class,
-        Expense::class,
-        AuditLog::class
+        Project::class,
+        Service::class,
+        Skill::class,
+        Experience::class,
+        Education::class,
+        Testimonial::class,
+        BlogPost::class,
+        Inquiry::class
     ],
-    version = 4,
+    version = 5,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {

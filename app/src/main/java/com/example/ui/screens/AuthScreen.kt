@@ -25,53 +25,55 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.POSViewModel
 import com.example.ui.Screen
+import com.example.ui.components.getSchemeColors
 
 @Composable
 fun AuthScreen(viewModel: POSViewModel) {
     val isLogin = viewModel.currentScreen == Screen.LOGIN
+    val colors = getSchemeColors(viewModel.activeColorScheme, viewModel.isDarkMode)
 
-    // Ambient Green Obsidian Gradient Background
+    // Premium ambient space-dark gradient background
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(
                 Brush.verticalGradient(
                     colors = listOf(
-                        Color(0xFF042014), // Obsidian Forest Green
-                        Color(0xFF0D3322), // Deep Zam Zam Green
-                        Color(0xFF001108)  // Solid Black Green
+                        Color(0xFF0F172A), // Slate 900
+                        Color(0xFF020617), // Slate 950
+                        Color(0xFF000000)  // Pitch Black
                     )
                 )
             ),
         contentAlignment = Alignment.Center
     ) {
-        // Decorative floating ambient glow lights
+        // Decorative radial glow lights
         Box(
             modifier = Modifier
-                .size(300.dp)
+                .size(350.dp)
                 .align(Alignment.TopStart)
-                .offset(x = (-100).dp, y = (-50).dp)
-                .background(Brush.radialGradient(listOf(Color(0x3310B981), Color.Transparent)))
+                .offset(x = (-120).dp, y = (-60).dp)
+                .background(Brush.radialGradient(listOf(colors.primary.copy(alpha = 0.25f), Color.Transparent)))
         )
         Box(
             modifier = Modifier
                 .size(350.dp)
                 .align(Alignment.BottomEnd)
-                .offset(x = 100.dp, y = 100.dp)
-                .background(Brush.radialGradient(listOf(Color(0x2210B981), Color.Transparent)))
+                .offset(x = 120.dp, y = 120.dp)
+                .background(Brush.radialGradient(listOf(colors.primary.copy(alpha = 0.15f), Color.Transparent)))
         )
 
         Card(
             modifier = Modifier
-                .fillMaxWidth(0.9f)
+                .fillMaxWidth(0.92f)
                 .padding(16.dp)
-                .border(1.dp, Color(0x33FFFFFF), RoundedCornerShape(24.dp))
+                .border(1.dp, Color(0x22FFFFFF), RoundedCornerShape(24.dp))
                 .testTag("auth_card"),
             shape = RoundedCornerShape(24.dp),
             colors = CardDefaults.cardColors(
-                containerColor = Color(0xD80B1E15) // Deep Green Glassmorphic look
+                containerColor = Color(0xEA0F172A) // Glassmorphic translucent slate
             ),
-            elevation = CardDefaults.cardElevation(defaultElevation = 12.dp)
+            elevation = CardDefaults.cardElevation(defaultElevation = 16.dp)
         ) {
             Column(
                 modifier = Modifier
@@ -80,43 +82,51 @@ fun AuthScreen(viewModel: POSViewModel) {
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
-                // Enterprise Shop Identity Logo
+                // Administrative Keyhole Badge
                 Box(
                     modifier = Modifier
-                        .size(72.dp)
+                        .size(68.dp)
                         .clip(RoundedCornerShape(20.dp))
-                        .background(Color(0xFF10B981))
-                        .border(1.dp, Color(0x66FFFFFF), RoundedCornerShape(20.dp)),
+                        .background(colors.primary)
+                        .border(1.dp, Color(0x44FFFFFF), RoundedCornerShape(20.dp)),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
-                        imageVector = Icons.Default.Storefront,
-                        contentDescription = "Shop Logo",
+                        imageVector = Icons.Default.AdminPanelSettings,
+                        contentDescription = "Console Identity Logo",
                         tint = Color.White,
-                        modifier = Modifier.size(40.dp)
+                        modifier = Modifier.size(36.dp)
                     )
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
 
                 Text(
-                    text = "Zam Zam Whole Sale",
-                    fontSize = 24.sp,
-                    fontWeight = FontWeight.Bold,
+                    text = viewModel.devName,
+                    fontSize = 22.sp,
+                    fontWeight = FontWeight.Black,
                     color = Color.White,
                     textAlign = TextAlign.Center
                 )
                 Text(
-                    text = "Shopping Centre & POS System",
-                    fontSize = 13.sp,
-                    color = Color(0xFFA7F3D0),
-                    fontWeight = FontWeight.Normal,
+                    text = "Authorized Admin Console",
+                    fontSize = 12.sp,
+                    color = colors.primary,
+                    fontWeight = FontWeight.Bold,
                     textAlign = TextAlign.Center
                 )
+                Text(
+                    text = "Unlock access to modify skill mastery levels, manage active services, or respond to client lead generation vaults.",
+                    fontSize = 10.sp,
+                    color = Color.LightGray.copy(alpha = 0.7f),
+                    textAlign = TextAlign.Center,
+                    lineHeight = 14.sp,
+                    modifier = Modifier.padding(top = 6.dp)
+                )
 
-                Spacer(modifier = Modifier.height(28.dp))
+                Spacer(modifier = Modifier.height(24.dp))
 
-                // Error message
+                // Error message banner
                 viewModel.authError?.let { err ->
                     Box(
                         modifier = Modifier
@@ -128,8 +138,8 @@ fun AuthScreen(viewModel: POSViewModel) {
                         Text(
                             text = err,
                             color = Color(0xFFFECACA),
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Medium,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
                             textAlign = TextAlign.Center,
                             modifier = Modifier.fillMaxWidth()
                         )
@@ -142,13 +152,13 @@ fun AuthScreen(viewModel: POSViewModel) {
                     OutlinedTextField(
                         value = viewModel.usernameInput,
                         onValueChange = { viewModel.usernameInput = it },
-                        label = { Text("Username", color = Color(0x88FFFFFF)) },
-                        placeholder = { Text("e.g. admin or cashier", color = Color(0x44FFFFFF)) },
-                        leadingIcon = { Icon(Icons.Default.Person, contentDescription = null, tint = Color(0xFF10B981)) },
+                        label = { Text("Admin Username", color = Color(0x88FFFFFF)) },
+                        placeholder = { Text("e.g., admin", color = Color(0x44FFFFFF)) },
+                        leadingIcon = { Icon(Icons.Default.Person, contentDescription = null, tint = colors.primary) },
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = Color(0xFF10B981),
+                            focusedBorderColor = colors.primary,
                             unfocusedBorderColor = Color(0x33FFFFFF),
-                            focusedLabelColor = Color(0xFF10B981),
+                            focusedLabelColor = colors.primary,
                             unfocusedLabelColor = Color(0x88FFFFFF),
                             focusedTextColor = Color.White,
                             unfocusedTextColor = Color.White
@@ -165,23 +175,23 @@ fun AuthScreen(viewModel: POSViewModel) {
                     OutlinedTextField(
                         value = viewModel.passwordInput,
                         onValueChange = { viewModel.passwordInput = it },
-                        label = { Text("Password", color = Color(0x88FFFFFF)) },
-                        leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null, tint = Color(0xFF10B981)) },
+                        label = { Text("Admin Password", color = Color(0x88FFFFFF)) },
+                        leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null, tint = colors.primary) },
                         trailingIcon = {
                             IconButton(onClick = { passwordVisible = !passwordVisible }) {
                                 Icon(
                                     imageVector = if (passwordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
                                     contentDescription = "Toggle password visibility",
-                                    tint = Color(0xFF10B981)
+                                    tint = colors.primary
                                 )
                             }
                         },
                         visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = Color(0xFF10B981),
+                            focusedBorderColor = colors.primary,
                             unfocusedBorderColor = Color(0x33FFFFFF),
-                            focusedLabelColor = Color(0xFF10B981),
+                            focusedLabelColor = colors.primary,
                             unfocusedLabelColor = Color(0x88FFFFFF),
                             focusedTextColor = Color.White,
                             unfocusedTextColor = Color.White
@@ -193,7 +203,6 @@ fun AuthScreen(viewModel: POSViewModel) {
 
                     Spacer(modifier = Modifier.height(12.dp))
 
-                    // Remember Me & Forgot Password Placeholder
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -204,30 +213,30 @@ fun AuthScreen(viewModel: POSViewModel) {
                                 checked = viewModel.rememberMe,
                                 onCheckedChange = { viewModel.rememberMe = it },
                                 colors = CheckboxDefaults.colors(
-                                    checkedColor = Color(0xFF10B981),
+                                    checkedColor = colors.primary,
                                     checkmarkColor = Color.White,
                                     uncheckedColor = Color(0x66FFFFFF)
                                 )
                             )
-                            Text("Remember Me", color = Color(0xFFA7F3D0), fontSize = 12.sp)
+                            Text("Stay Logged In", color = Color.White, fontSize = 11.sp)
                         }
-                        TextButton(onClick = { viewModel.authError = "Please contact Haji Zam Zam Administrator to reset password." }) {
-                            Text("Forgot?", color = Color(0xFF34D399), fontSize = 12.sp)
+                        TextButton(onClick = { viewModel.authError = "Hint: Access is pre-seeded with admin / admin." }) {
+                            Text("Need Hint?", color = colors.primary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(24.dp))
+                    Spacer(modifier = Modifier.height(20.dp))
 
                     Button(
                         onClick = { viewModel.performLogin() },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
+                        colors = ButtonDefaults.buttonColors(containerColor = colors.primary),
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(50.dp)
+                            .height(48.dp)
                             .testTag("login_button"),
                         shape = RoundedCornerShape(12.dp)
                     ) {
-                        Text("LOGIN TO TERMINAL", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = Color.White)
+                        Text("LOGIN TO CONSOLE", fontWeight = FontWeight.Black, fontSize = 14.sp, color = Color.White)
                     }
 
                     Spacer(modifier = Modifier.height(16.dp))
@@ -237,9 +246,9 @@ fun AuthScreen(viewModel: POSViewModel) {
                         horizontalArrangement = Arrangement.Center,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text("Need a staff account?", color = Color(0x99FFFFFF), fontSize = 13.sp)
+                        Text("No admin credentials?", color = Color(0x99FFFFFF), fontSize = 12.sp)
                         TextButton(onClick = { viewModel.currentScreen = Screen.SIGNUP; viewModel.authError = null }) {
-                            Text("Sign Up", color = Color(0xFF34D399), fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                            Text("Register Account", color = colors.primary, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                         }
                     }
 
@@ -248,10 +257,10 @@ fun AuthScreen(viewModel: POSViewModel) {
                     OutlinedTextField(
                         value = viewModel.regDisplayName,
                         onValueChange = { viewModel.regDisplayName = it },
-                        label = { Text("Full Name / Nickname", color = Color(0x88FFFFFF)) },
-                        leadingIcon = { Icon(Icons.Default.Badge, contentDescription = null, tint = Color(0xFF10B981)) },
+                        label = { Text("Display Name", color = Color(0x88FFFFFF)) },
+                        leadingIcon = { Icon(Icons.Default.Badge, contentDescription = null, tint = colors.primary) },
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = Color(0xFF10B981),
+                            focusedBorderColor = colors.primary,
                             unfocusedBorderColor = Color(0x33FFFFFF),
                             focusedTextColor = Color.White,
                             unfocusedTextColor = Color.White
@@ -264,10 +273,10 @@ fun AuthScreen(viewModel: POSViewModel) {
                     OutlinedTextField(
                         value = viewModel.regUsername,
                         onValueChange = { viewModel.regUsername = it },
-                        label = { Text("Username", color = Color(0x88FFFFFF)) },
-                        leadingIcon = { Icon(Icons.Default.Person, contentDescription = null, tint = Color(0xFF10B981)) },
+                        label = { Text("Pick Username", color = Color(0x88FFFFFF)) },
+                        leadingIcon = { Icon(Icons.Default.Person, contentDescription = null, tint = colors.primary) },
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = Color(0xFF10B981),
+                            focusedBorderColor = colors.primary,
                             unfocusedBorderColor = Color(0x33FFFFFF),
                             focusedTextColor = Color.White,
                             unfocusedTextColor = Color.White
@@ -280,10 +289,10 @@ fun AuthScreen(viewModel: POSViewModel) {
                     OutlinedTextField(
                         value = viewModel.regPassword,
                         onValueChange = { viewModel.regPassword = it },
-                        label = { Text("Password", color = Color(0x88FFFFFF)) },
-                        leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null, tint = Color(0xFF10B981)) },
+                        label = { Text("Set Password", color = Color(0x88FFFFFF)) },
+                        leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null, tint = colors.primary) },
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = Color(0xFF10B981),
+                            focusedBorderColor = colors.primary,
                             unfocusedBorderColor = Color(0x33FFFFFF),
                             focusedTextColor = Color.White,
                             unfocusedTextColor = Color.White
@@ -291,56 +300,18 @@ fun AuthScreen(viewModel: POSViewModel) {
                         modifier = Modifier.fillMaxWidth().testTag("reg_password")
                     )
 
-                    Spacer(modifier = Modifier.height(14.dp))
-
-                    // Role Picker Dropdown Simulation (Clean Radio selection buttons)
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(Color(0x11FFFFFF), RoundedCornerShape(12.dp))
-                            .padding(12.dp)
-                    ) {
-                        Text("Select System Role Permission:", color = Color(0x88FFFFFF), fontSize = 11.sp)
-                        Spacer(modifier = Modifier.height(6.dp))
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceAround
-                        ) {
-                            listOf("Cashier", "Manager", "Admin").forEach { role ->
-                                val isSelected = viewModel.regRole == role
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    modifier = Modifier.background(
-                                        if (isSelected) Color(0x2210B981) else Color.Transparent,
-                                        RoundedCornerShape(8.dp)
-                                    ).padding(horizontal = 8.dp, vertical = 4.dp)
-                                ) {
-                                    RadioButton(
-                                        selected = isSelected,
-                                        onClick = { viewModel.regRole = role },
-                                        colors = RadioButtonDefaults.colors(
-                                            selectedColor = Color(0xFF10B981),
-                                            unselectedColor = Color(0x66FFFFFF)
-                                        )
-                                    )
-                                    Text(role, color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                                }
-                            }
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(24.dp))
+                    Spacer(modifier = Modifier.height(20.dp))
 
                     Button(
                         onClick = { viewModel.performSignup() },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
+                        colors = ButtonDefaults.buttonColors(containerColor = colors.primary),
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(50.dp)
+                            .height(48.dp)
                             .testTag("signup_button"),
                         shape = RoundedCornerShape(12.dp)
                     ) {
-                        Text("REGISTER ACCOUNT", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = Color.White)
+                        Text("CREATE ADMIN KEY", fontWeight = FontWeight.Black, fontSize = 14.sp, color = Color.White)
                     }
 
                     Spacer(modifier = Modifier.height(16.dp))
@@ -350,9 +321,9 @@ fun AuthScreen(viewModel: POSViewModel) {
                         horizontalArrangement = Arrangement.Center,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text("Already have a terminal key?", color = Color(0x99FFFFFF), fontSize = 13.sp)
+                        Text("Already registered?", color = Color(0x99FFFFFF), fontSize = 12.sp)
                         TextButton(onClick = { viewModel.currentScreen = Screen.LOGIN; viewModel.authError = null }) {
-                            Text("Login", color = Color(0xFF34D399), fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                            Text("Login", color = colors.primary, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                         }
                     }
                 }

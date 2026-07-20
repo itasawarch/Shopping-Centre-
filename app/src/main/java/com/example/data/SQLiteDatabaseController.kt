@@ -45,7 +45,7 @@ class SQLiteDatabaseController(private val context: Context, private val reposit
      */
     suspend fun getTableStats(): List<TableStat> = withContext(Dispatchers.IO) {
         val stats = mutableListOf<TableStat>()
-        val tables = listOf("users", "products", "customers", "suppliers", "sales", "sale_items", "purchases", "purchase_items", "expenses", "audit_logs")
+        val tables = listOf("users", "projects", "services", "skills", "experiences", "educations", "testimonials", "blogs", "inquiries")
         
         try {
             val rawDb = repository.db.openHelper.writableDatabase

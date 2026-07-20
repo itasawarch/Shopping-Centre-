@@ -112,9 +112,6 @@ fun MainTerminalLayout(viewModel: POSViewModel) {
                         MainTab.SETTINGS -> {
                             viewModel.firebaseAuthService.isAuthorized(viewModel.loggedInUser, "ADMIN")
                         }
-                        MainTab.REPORTS, MainTab.PRODUCTS, MainTab.EXPENSES -> {
-                            viewModel.firebaseAuthService.isAuthorized(viewModel.loggedInUser, "MANAGER")
-                        }
                         else -> true
                     }
 
@@ -124,6 +121,7 @@ fun MainTerminalLayout(viewModel: POSViewModel) {
                             MainTab.POS -> POSTab(viewModel)
                             MainTab.PRODUCTS -> ProductsTab(viewModel)
                             MainTab.CUSTOMERS -> CustomersSuppliersTab(viewModel)
+                            MainTab.SUPPLIERS -> TimelinesTab(viewModel)
                             MainTab.EXPENSES -> ExpensesTab(viewModel)
                             MainTab.REPORTS -> ReportsTab(viewModel)
                             MainTab.SETTINGS -> SettingsTab(viewModel)
@@ -148,11 +146,12 @@ fun MainTerminalLayout(viewModel: POSViewModel) {
                     .background(Color.Black.copy(alpha = 0.5f))
                     .clickable { isDrawerOpen = false }
             ) {
+                val colors = getSchemeColors(viewModel.activeColorScheme, viewModel.isDarkMode)
                 Box(
                     modifier = Modifier
                         .fillMaxHeight()
                         .width(260.dp)
-                        .background(Color.White)
+                        .background(colors.surface)
                         .clickable(enabled = false) {} // prevent clicking behind
                         .align(Alignment.CenterStart)
                 ) {
@@ -167,13 +166,14 @@ fun MainTerminalLayout(viewModel: POSViewModel) {
 
     // Low Stock / Expiry Alerts Modal Dialog
     if (showNotificationsDialog) {
+        val colors = getSchemeColors(viewModel.activeColorScheme, viewModel.isDarkMode)
         Dialog(onDismissRequest = { showNotificationsDialog = false }) {
             Card(
                 modifier = Modifier
                     .fillMaxWidth(0.95f)
                     .fillMaxHeight(0.7f),
                 shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                colors = CardDefaults.cardColors(containerColor = colors.surface)
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Row(
@@ -182,20 +182,20 @@ fun MainTerminalLayout(viewModel: POSViewModel) {
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.Notifications, contentDescription = null, tint = Color(0xFF059669))
+                            Icon(Icons.Default.Notifications, contentDescription = null, tint = colors.primary)
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("System Notifications & Stock Alerts", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                            Text("System Notifications & Alert Center", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = colors.textPrimary)
                         }
                         IconButton(onClick = { showNotificationsDialog = false }) {
-                            Icon(Icons.Default.Close, contentDescription = null)
+                            Icon(Icons.Default.Close, contentDescription = null, tint = colors.textSecondary)
                         }
                     }
 
-                    Divider(modifier = Modifier.padding(vertical = 8.dp))
+                    Divider(modifier = Modifier.padding(vertical = 8.dp), color = colors.border)
 
                     if (viewModel.notifications.isEmpty()) {
                         Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                            Text("All inventory levels are fully optimal. No current warnings.", color = Color.Gray, fontSize = 12.sp)
+                            Text("No current notifications.", color = colors.textSecondary, fontSize = 12.sp)
                         }
                     } else {
                         LazyColumn(
@@ -206,12 +206,13 @@ fun MainTerminalLayout(viewModel: POSViewModel) {
                                 Card(
                                     modifier = Modifier.fillMaxWidth(),
                                     colors = CardDefaults.cardColors(
-                                        containerColor = if (note.contains("🚨") || note.contains("OUT")) Color(0xFFFEF2F2) else Color(0xFFFFFBEB)
+                                        containerColor = if (note.contains("🚨") || note.contains("OUT")) Color(0xFFFEF2F2) else colors.bgMain
                                     )
                                 ) {
                                     Text(
                                         text = note,
                                         fontSize = 12.sp,
+                                        color = colors.textPrimary,
                                         modifier = Modifier.padding(12.dp),
                                         fontWeight = FontWeight.Medium
                                     )
@@ -229,20 +230,21 @@ fun MainTerminalLayout(viewModel: POSViewModel) {
 
 @Composable
 fun SecurityAccessDeniedScreen(viewModel: POSViewModel) {
+    val colors = getSchemeColors(viewModel.activeColorScheme, viewModel.isDarkMode)
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFFF8FAFC))
+            .background(colors.bgMain)
             .padding(24.dp),
         contentAlignment = Alignment.Center
     ) {
         Card(
             modifier = Modifier
                 .fillMaxWidth(0.9f)
-                .border(1.dp, Color(0xFFE2E8F0), RoundedCornerShape(20.dp))
+                .border(1.dp, colors.border, RoundedCornerShape(20.dp))
                 .testTag("security_access_denied_card"),
             shape = RoundedCornerShape(20.dp),
-            colors = CardDefaults.cardColors(containerColor = Color.White),
+            colors = CardDefaults.cardColors(containerColor = colors.surface),
             elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
         ) {
             Column(
@@ -257,13 +259,13 @@ fun SecurityAccessDeniedScreen(viewModel: POSViewModel) {
                     modifier = Modifier
                         .size(64.dp)
                         .clip(RoundedCornerShape(16.dp))
-                        .background(Color(0xFFFEE2E2)),
+                        .background(Color.Red.copy(alpha = 0.15f)),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         imageVector = Icons.Default.AdminPanelSettings,
                         contentDescription = "Shield Guard",
-                        tint = Color(0xFFEF4444),
+                        tint = Color.Red,
                         modifier = Modifier.size(36.dp)
                     )
                 }
@@ -274,7 +276,7 @@ fun SecurityAccessDeniedScreen(viewModel: POSViewModel) {
                     text = "Role-Based Access Protected",
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Color(0xFF1E293B)
+                    color = colors.textPrimary
                 )
 
                 Spacer(modifier = Modifier.height(6.dp))
@@ -283,9 +285,9 @@ fun SecurityAccessDeniedScreen(viewModel: POSViewModel) {
                     text = "Firebase Auth Security Enforcement",
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Color(0xFF059669),
+                    color = colors.primary,
                     modifier = Modifier
-                        .background(Color(0xFFE6F4EA), RoundedCornerShape(6.dp))
+                        .background(colors.primary.copy(alpha = 0.15f), RoundedCornerShape(6.dp))
                         .padding(horizontal = 8.dp, vertical = 4.dp)
                 )
 
@@ -294,14 +296,14 @@ fun SecurityAccessDeniedScreen(viewModel: POSViewModel) {
                 Text(
                     text = "The console panel you selected (${viewModel.currentTab.name}) is protected by rule-based database authorization. Only users logged in with 'Admin' credentials are authorized to view reports, system logs, or change system settings.",
                     fontSize = 12.sp,
-                    color = Color(0xFF64748B),
+                    color = colors.textSecondary,
                     textAlign = TextAlign.Center,
                     lineHeight = 18.sp
                 )
 
                 Spacer(modifier = Modifier.height(20.dp))
 
-                Divider(color = Color(0xFFF1F5F9))
+                Divider(color = colors.border)
 
                 Spacer(modifier = Modifier.height(16.dp))
 
@@ -309,7 +311,7 @@ fun SecurityAccessDeniedScreen(viewModel: POSViewModel) {
                     onClick = {
                         viewModel.performLogout()
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444)),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.Red),
                     shape = RoundedCornerShape(10.dp),
                     modifier = Modifier.fillMaxWidth()
                 ) {
@@ -325,9 +327,9 @@ fun SecurityAccessDeniedScreen(viewModel: POSViewModel) {
                         viewModel.currentTab = MainTab.DASHBOARD
                     },
                     shape = RoundedCornerShape(10.dp),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF1E293B)),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = colors.textPrimary),
                     modifier = Modifier.fillMaxWidth(),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE2E8F0))
+                    border = androidx.compose.foundation.BorderStroke(1.dp, colors.border)
                 ) {
                     Text("Return to Safety Dashboard", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                 }
